@@ -1,0 +1,1 @@
+Strain and left ventricular volume among 17 partitions in a heart model with fixed geometry
