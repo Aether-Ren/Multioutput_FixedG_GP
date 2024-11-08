@@ -642,96 +642,89 @@ def estimate_params_for_NN_Adam(NN_model, row_idx, test_y, initial_guess, param_
 #############################################
 
 
-def run_mcmc_Uniform(Pre_function, Models, Likelihoods, row_idx, test_y, bounds, num_sampling=2000, warmup_step=1000):
+def run_mcmc_Uniform(Pre_function, Models, Likelihoods, row_idx, test_y, bounds, num_sampling=2000, warmup_step=1000, device='cpu'):
     def model():
         params = []
         
         for i, (min_val, max_val) in enumerate(bounds):
-            # 使用 Uniform 分布作为先验
-            param_i = pyro.sample(f'param_{i}', dist.Uniform(min_val, max_val))
+            param_i = pyro.sample(f'param_{i}', dist.Uniform(torch.tensor(min_val, device=device), torch.tensor(max_val, device=device)))
             params.append(param_i)
         
-        theta = torch.stack(params)
+        theta = torch.stack(params).to(device)
         
-        sigma = pyro.sample('sigma', dist.HalfNormal(10.0))
+        sigma = pyro.sample('sigma', dist.HalfNormal(10.0).to(device))
         
-        mu_value = Pre_function(Models, Likelihoods, theta.unsqueeze(0)).squeeze()
+        mu_value = Pre_function(Models, Likelihoods, theta.unsqueeze(0)).squeeze().to(device)
         
-        y_obs = test_y[row_idx, :]
+        y_obs = test_y[row_idx, :].to(device)
         
         pyro.sample('obs', dist.Normal(mu_value, sigma), obs=y_obs)
 
     nuts_kernel = NUTS(model)
     mcmc = MCMC(nuts_kernel, num_samples=num_sampling, warmup_steps=warmup_step)
     mcmc.run()
-
-    # posterior_samples = mcmc.get_samples()
-
-    # idata = az.from_pyro(mcmc)
-
-    # summary = az.summary(idata, hdi_prob=0.95)
     
     return mcmc
 
 
 
-def run_mcmc_Normal(Pre_function, Models, Likelihoods, row_idx, test_y, local_train_x, num_sampling=2000, warmup_step=1000):
+def run_mcmc_Normal(Pre_function, Models, Likelihoods, row_idx, test_y, local_train_x, num_sampling=2000, warmup_step=1000, device='cpu'):
     def model():
         params = []
+
+        local_train_x_device = local_train_x.to(device)
+        test_y_device = test_y.to(device)
         
-        for i in range(local_train_x.shape[1]):
-            mean = local_train_x[:, i].mean()
-            std = local_train_x[:, i].std()
+        for i in range(local_train_x_device.shape[1]):
+            mean = local_train_x_device[:, i].mean()
+            std = local_train_x_device[:, i].std()
             param_i = pyro.sample(f'param_{i}', dist.Normal(mean, std))
             params.append(param_i)
-        
-        theta = torch.stack(params)
-        
-        sigma = pyro.sample('sigma', dist.HalfNormal(10.0))
-        
-        mu_value = Pre_function(Models, Likelihoods, theta.unsqueeze(0)).squeeze()
-        
-        y_obs = test_y[row_idx, :]
-        
+
+        theta = torch.stack(params).to(device)
+
+        sigma = pyro.sample('sigma', dist.HalfNormal(10.0).to(device))
+
+        mu_value = Pre_function(Models, Likelihoods, theta.unsqueeze(0)).squeeze().to(device)
+
+        y_obs = test_y_device[row_idx, :]
+
         pyro.sample('obs', dist.Normal(mu_value, sigma), obs=y_obs)
 
     nuts_kernel = NUTS(model)
     mcmc = MCMC(nuts_kernel, num_samples=num_sampling, warmup_steps=warmup_step)
+    
+
     mcmc.run()
 
-    # posterior_samples = mcmc.get_samples()
-
-    # idata = az.from_pyro(mcmc)
-
-    # summary = az.summary(idata, hdi_prob=0.95)
-    
     return mcmc
 
-def run_mcmc_Normal_pca(Pre_function, Models, Likelihoods, PCA, row_idx, test_y, local_train_x, num_sampling=2000, warmup_step=1000):
+def run_mcmc_Normal_pca(Pre_function, Models, Likelihoods, PCA, row_idx, test_y, local_train_x, num_sampling=2000, warmup_step=1000, device='cpu'):
     def model():
         params = []
         
-        for i in range(local_train_x.shape[1]):
-            mean = local_train_x[:, i].mean()
-            std = local_train_x[:, i].std()
+        local_train_x_device = local_train_x.to(device)
+        
+        for i in range(local_train_x_device.shape[1]):
+            mean = local_train_x_device[:, i].mean()
+            std = local_train_x_device[:, i].std()
             param_i = pyro.sample(f'param_{i}', dist.Normal(mean, std))
             params.append(param_i)
         
-        theta = torch.stack(params)
+        theta = torch.stack(params).to(device)
         
-        sigma = pyro.sample('sigma', dist.HalfNormal(10.0))
+        sigma = pyro.sample('sigma', dist.HalfNormal(10.0).to(device))
         
-        mu_value = PCA.inverse_transform(Pre_function(Models, Likelihoods, theta.unsqueeze(0)).squeeze()).detach().numpy()
+        mu_value = PCA.inverse_transform(Pre_function(Models, Likelihoods, theta.unsqueeze(0)).squeeze().cpu()).detach().numpy()
         
-        y_obs = test_y[row_idx, :].detach().numpy()
+        y_obs = test_y[row_idx, :].cpu().detach().numpy()
         
-        pyro.sample('obs', dist.Normal(mu_value, sigma), obs=y_obs)
+        pyro.sample('obs', dist.Normal(mu_value.to(device), sigma), obs=y_obs.to(device))
 
     nuts_kernel = NUTS(model)
     mcmc = MCMC(nuts_kernel, num_samples=num_sampling, warmup_steps=warmup_step)
     mcmc.run()
 
-    
     return mcmc
 
 
