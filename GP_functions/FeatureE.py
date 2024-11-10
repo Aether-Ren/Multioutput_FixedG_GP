@@ -34,13 +34,13 @@ class FeatureExtractor_1(torch.nn.Sequential):
 class FeatureExtractor_2(torch.nn.Sequential):
     def __init__(self, train_x):
         super(FeatureExtractor_2, self).__init__()
-        self.add_module('linear1', torch.nn.Linear(train_x.size(-1), 256))
+        self.add_module('linear1', torch.nn.Linear(train_x.size(-1), 512))
         self.add_module('relu1', torch.nn.ReLU())
-        self.add_module('linear2', torch.nn.Linear(256, 128))
+        self.add_module('linear2', torch.nn.Linear(512, 256))
         self.add_module('relu2', torch.nn.ReLU())
-        self.add_module('linear3', torch.nn.Linear(128, 32))
+        self.add_module('linear3', torch.nn.Linear(256, 64))
         self.add_module('relu3', torch.nn.ReLU())
-        self.add_module('linear4', torch.nn.Linear(32, 16))
+        self.add_module('linear4', torch.nn.Linear(64, 20))
 
 
 class FeatureExtractor_3(torch.nn.Sequential):
