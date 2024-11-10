@@ -19,6 +19,7 @@ import scipy.stats as stats
 
 import pyro
 import pyro.distributions as dist
+import pyro.distributions.transforms as transforms
 from pyro.infer import MCMC, NUTS
 import arviz as az
 
@@ -644,12 +645,50 @@ def estimate_params_for_NN_Adam(NN_model, row_idx, test_y, initial_guess, param_
 #############################################
 
 
+# def run_mcmc_Uniform(Pre_function, Models, Likelihoods, row_idx, test_y, bounds, PCA_func = 'None', num_sampling=2000, warmup_step=1000, num_chains=1):
+#     def model():
+#         params = []
+        
+#         for i, (min_val, max_val) in enumerate(bounds):
+#             param_i = pyro.sample(f'param_{i}', dist.Uniform(min_val, max_val))
+#             params.append(param_i)
+        
+#         theta = torch.stack(params)
+        
+#         sigma = pyro.sample('sigma', dist.HalfNormal(10.0))
+#         if PCA_func == 'None':
+#             mu_value = Pre_function(Models, Likelihoods, theta.unsqueeze(0)).squeeze()
+#         else:
+#             components = torch.from_numpy(PCA_func.components_).to(dtype=torch.float32)
+#             mean_PCA = torch.from_numpy(PCA_func.mean_).to(dtype=torch.float32)
+#             preds = Pre_function(Models, Likelihoods, theta.unsqueeze(0))
+            
+#             mu_value = (torch.matmul(preds, components) + mean_PCA).squeeze()
+
+        
+#         y_obs = test_y[row_idx, :]
+        
+#         pyro.sample('obs', dist.Normal(mu_value, sigma), obs=y_obs)
+
+#     nuts_kernel = NUTS(model)
+#     mcmc = MCMC(nuts_kernel, num_samples=num_sampling, warmup_steps=warmup_step, num_chains=num_chains)
+#     mcmc.run()
+
+#     # posterior_samples = mcmc.get_samples()
+
+#     # idata = az.from_pyro(mcmc)
+
+#     # summary = az.summary(idata, hdi_prob=0.95)
+    
+#     return mcmc
+
+
 def run_mcmc_Uniform(Pre_function, Models, Likelihoods, row_idx, test_y, bounds, PCA_func = 'None', num_sampling=2000, warmup_step=1000, num_chains=1):
     def model():
         params = []
         
-        for i, (min_val, max_val) in enumerate(bounds):
-            param_i = pyro.sample(f'param_{i}', dist.Uniform(min_val, max_val))
+        for i in range(len(bounds)):
+            param_i = pyro.sample(f'param_{i}', dist.Uniform(0, 1))
             params.append(param_i)
         
         theta = torch.stack(params)
@@ -669,8 +708,15 @@ def run_mcmc_Uniform(Pre_function, Models, Likelihoods, row_idx, test_y, bounds,
         
         pyro.sample('obs', dist.Normal(mu_value, sigma), obs=y_obs)
 
+    param_transforms = {
+        f'param_{i}': transforms.ComposeTransform([
+            transforms.SigmoidTransform(),  
+            transforms.AffineTransform(loc=bounds[i][0], scale=bounds[i][1] - bounds[i][0]) 
+        ]) for i in range(len(bounds))
+    }
+
     nuts_kernel = NUTS(model)
-    mcmc = MCMC(nuts_kernel, num_samples=num_sampling, warmup_steps=warmup_step, num_chains=num_chains)
+    mcmc = MCMC(nuts_kernel, num_samples=num_sampling, warmup_steps=warmup_step, transforms=param_transforms, num_chains=num_chains)
     mcmc.run()
 
     # posterior_samples = mcmc.get_samples()
