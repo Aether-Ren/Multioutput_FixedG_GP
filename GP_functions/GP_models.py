@@ -162,8 +162,9 @@ class MultitaskGPModel_lcm(gpytorch.models.ExactGP):
         )
         self.covar_module = gpytorch.kernels.LCMKernel(
             [
-             gpytorch.kernels.SpectralMixtureKernel(num_mixtures=3, ard_num_dims=train_x.size(-1)),
-            #  gpytorch.kernels.MaternKernel(nu=1.5,ard_num_dims=train_x.size(-1)),
+            #  gpytorch.kernels.SpectralMixtureKernel(num_mixtures=3, ard_num_dims=train_x.size(-1)),
+             gpytorch.kernels.MaternKernel(nu=1.5,ard_num_dims=train_x.size(-1)),
+             gpytorch.kernels.MaternKernel(nu=2.5,ard_num_dims=train_x.size(-1)),
              gpytorch.kernels.RQKernel(ard_num_dims=train_x.size(-1))], 
             num_tasks=n_tasks, rank=1
         )

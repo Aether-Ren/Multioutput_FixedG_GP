@@ -15,6 +15,8 @@ from scipy.optimize import basinhopping
 import GP_functions.Prediction as Prediction
 import tqdm
 
+import scipy.stats as stats
+
 import pyro
 import pyro.distributions as dist
 from pyro.infer import MCMC, NUTS
@@ -642,7 +644,7 @@ def estimate_params_for_NN_Adam(NN_model, row_idx, test_y, initial_guess, param_
 #############################################
 
 
-def run_mcmc_Uniform(Pre_function, Models, Likelihoods, row_idx, test_y, bounds, num_sampling=2000, warmup_step=1000):
+def run_mcmc_Uniform(Pre_function, Models, Likelihoods, row_idx, test_y, bounds, num_sampling=2000, warmup_step=1000, num_chains=1):
     def model():
         params = []
         
@@ -661,7 +663,7 @@ def run_mcmc_Uniform(Pre_function, Models, Likelihoods, row_idx, test_y, bounds,
         pyro.sample('obs', dist.Normal(mu_value, sigma), obs=y_obs)
 
     nuts_kernel = NUTS(model)
-    mcmc = MCMC(nuts_kernel, num_samples=num_sampling, warmup_steps=warmup_step)
+    mcmc = MCMC(nuts_kernel, num_samples=num_sampling, warmup_steps=warmup_step, num_chains=num_chains)
     mcmc.run()
 
     # posterior_samples = mcmc.get_samples()
@@ -674,13 +676,14 @@ def run_mcmc_Uniform(Pre_function, Models, Likelihoods, row_idx, test_y, bounds,
 
 
 
-def run_mcmc_Normal(Pre_function, Models, Likelihoods, row_idx, test_y, local_train_x, num_sampling=2000, warmup_step=1000):
+def run_mcmc_Normal(Pre_function, Models, Likelihoods, row_idx, test_y, local_train_x, num_sampling=2000, warmup_step=1000, num_chains=1):
     def model():
         params = []
         
         for i in range(local_train_x.shape[1]):
-            mean = local_train_x[:, i].mean()
-            std = local_train_x[:, i].std()
+            # mean = local_train_x[:, i].mean()
+            # std = local_train_x[:, i].std()
+            mean, std = stats.norm.fit(local_train_x[:, i])
             param_i = pyro.sample(f'param_{i}', dist.Normal(mean, std))
             params.append(param_i)
         
@@ -695,7 +698,7 @@ def run_mcmc_Normal(Pre_function, Models, Likelihoods, row_idx, test_y, local_tr
         pyro.sample('obs', dist.Normal(mu_value, sigma), obs=y_obs)
 
     nuts_kernel = NUTS(model)
-    mcmc = MCMC(nuts_kernel, num_samples=num_sampling, warmup_steps=warmup_step)
+    mcmc = MCMC(nuts_kernel, num_samples=num_sampling, warmup_steps=warmup_step, num_chains=num_chains)
     mcmc.run()
 
     # posterior_samples = mcmc.get_samples()
@@ -708,13 +711,14 @@ def run_mcmc_Normal(Pre_function, Models, Likelihoods, row_idx, test_y, local_tr
 
 
 
-def run_mcmc_Normal_pca(Pre_function, Models, Likelihoods, PCA_func, row_idx, test_y, local_train_x, num_sampling=2000, warmup_step=1000):
+def run_mcmc_Normal_pca(Pre_function, Models, Likelihoods, PCA_func, row_idx, test_y, local_train_x, num_sampling=2000, warmup_step=1000, num_chains=1):
     def model():
         params = []
         
         for i in range(local_train_x.shape[1]):
-            mean = local_train_x[:, i].mean()
-            std = local_train_x[:, i].std()
+            # mean = local_train_x[:, i].mean()
+            # std = local_train_x[:, i].std()
+            mean, std = stats.norm.fit(local_train_x[:, i])
             param_i = pyro.sample(f'param_{i}', dist.Normal(mean, std))
             params.append(param_i)
         
@@ -733,7 +737,7 @@ def run_mcmc_Normal_pca(Pre_function, Models, Likelihoods, PCA_func, row_idx, te
         pyro.sample('obs', dist.Normal(mu_value, sigma), obs=y_obs)
 
     nuts_kernel = NUTS(model)
-    mcmc = MCMC(nuts_kernel, num_samples=num_sampling, warmup_steps=warmup_step)
+    mcmc = MCMC(nuts_kernel, num_samples=num_sampling, warmup_steps=warmup_step, num_chains=num_chains)
     mcmc.run()
 
     
