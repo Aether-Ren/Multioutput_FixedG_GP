@@ -710,7 +710,7 @@ def run_mcmc_Uniform(Pre_function, Models, Likelihoods, row_idx, test_y, bounds,
 
     param_transforms = {
         f'param_{i}': transforms.ComposeTransform([
-            transforms.SigmoidTransform(),  
+            # transforms.SigmoidTransform(),  
             transforms.AffineTransform(loc=bounds[i][0], scale=bounds[i][1] - bounds[i][0]) 
         ]) for i in range(len(bounds))
     }
