@@ -766,77 +766,56 @@ def run_mcmc_Normal(Pre_function, Models, Likelihoods, row_idx, test_y, local_tr
 
 
 
-# def run_mcmc_Normal_pca(Pre_function, Models, Likelihoods, row_idx, test_y, local_train_x, PCA_func, num_sampling=2000, warmup_step=1000, num_chains=1):
+
+# def run_mcmc_Normal(
+#     Pre_function, 
+#     Models, 
+#     Likelihoods, 
+#     row_idx, 
+#     test_y, 
+#     local_train_x, 
+#     PCA_func='None', 
+#     num_sampling=2000, 
+#     warmup_step=1000, 
+#     num_chains=1
+# ):
+
+
 #     def model():
 #         params = []
-        
 #         for i in range(local_train_x.shape[1]):
-#             # mean = local_train_x[:, i].mean()
-#             # std = local_train_x[:, i].std()
-#             mean, std = stats.norm.fit(local_train_x[:, i])
-#             param_i = pyro.sample(f'param_{i}', dist.Normal(mean, std))
+#             mean, std = stats.norm.fit(local_train_x[:, i].cpu().numpy())
+#             param_i = pyro.sample(f'param_{i}', dist.Normal(mean, std).to_event(0))
 #             params.append(param_i)
-        
+
 #         theta = torch.stack(params)
-        
 #         sigma = pyro.sample('sigma', dist.HalfNormal(10.0))
 
-#         components = torch.from_numpy(PCA_func.components_).to(dtype=torch.float32)
-#         mean_PCA = torch.from_numpy(PCA_func.mean_).to(dtype=torch.float32)
-#         preds = Pre_function(Models, Likelihoods, theta.unsqueeze(0))
-        
-#         mu_value = (torch.matmul(preds, components) + mean_PCA).squeeze()
-        
+#         if PCA_func == 'None':
+#             mu_value = Pre_function(Models, Likelihoods, theta.unsqueeze(0)).squeeze()
+#         else:
+#             components = torch.from_numpy(PCA_func.components_).to(dtype=torch.float32)
+#             mean_PCA = torch.from_numpy(PCA_func.mean_).to(dtype=torch.float32)
+#             preds = Pre_function(Models, Likelihoods, theta.unsqueeze(0))
+#             mu_value = (torch.matmul(preds, components) + mean_PCA).squeeze()
+
 #         y_obs = test_y[row_idx, :]
-        
 #         pyro.sample('obs', dist.Normal(mu_value, sigma), obs=y_obs)
 
+   
 #     nuts_kernel = NUTS(model)
-#     mcmc = MCMC(nuts_kernel, num_samples=num_sampling, warmup_steps=warmup_step, num_chains=num_chains)
+    
+   
+#     mcmc = MCMC(
+#         nuts_kernel, 
+#         num_samples=num_sampling, 
+#         warmup_steps=warmup_step, 
+#         num_chains=num_chains, 
+#         mp_context="fork"  
+#     )
+
+  
 #     mcmc.run()
 
-    
+
 #     return mcmc
-
-
-# bounds = bound.get_bounds(local_train_x)
-
-
-# def model():
-
-#     params = []
-    
-#     for i, (min_val, max_val) in enumerate(bounds):
-#         mean = (min_val + max_val) / 2
-#         std = (max_val - min_val) / 4  
-        
-#         param_i = pyro.sample(f'param_{i}', dist.Normal(mean, std))
-#         params.append(param_i)
-    
-#     theta = torch.stack(params)
-    
-#     sigma = pyro.sample('sigma', dist.HalfNormal(10.0))
-    
-#     mu = Prediction.preds_for_one_model(MultitaskGP_models, MultitaskGP_likelihoods, theta.unsqueeze(0)).squeeze()
-    
-
-#     y_obs = test_y[row_idx, :]
-    
-#     pyro.sample('obs', dist.Normal(mu, sigma), obs=y_obs)
-    
-
-# nuts_kernel = NUTS(model)
-# mcmc = MCMC(nuts_kernel, num_samples=2000, warmup_steps=1000)
-# mcmc.run()
-
-
-# posterior_samples_Normal = mcmc.get_samples()
-
-
-# idata = az.from_pyro(mcmc)
-# az.plot_trace(idata)
-# plt.show()
-
-
-# summary = az.summary(idata, hdi_prob=0.95)
-# print(summary)
