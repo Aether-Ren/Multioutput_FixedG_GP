@@ -50,8 +50,8 @@ input_point = test_y[row_idx,:]
 local_train_x, local_train_y = Tools.find_k_nearest_neighbors_CPU(input_point, train_x, train_y, k = 100)
 
 
-LocalGP_models_48, LocalGP_likelihoods_48 = Training.train_one_row_LocalGP_Parallel(train_x, train_y_48, 
-                                                                              test_y_48, row_idx, covar_type = 'RQ', k_num = 100,
+LocalGP_models_48, LocalGP_likelihoods_48 = Training.train_one_row_LocalGP_Parallel(train_x, train_y, 
+                                                                              test_y, row_idx, covar_type = 'RQ', k_num = 100,
                                                                               lr=0.025, num_iterations=5000, 
                                                                               patience=10, device=Device)
 
