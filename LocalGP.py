@@ -50,10 +50,11 @@ input_point = test_y[row_idx,:]
 local_train_x, local_train_y = Tools.find_k_nearest_neighbors_CPU(input_point, train_x, train_y, k = 100)
 
 
-LocalGP_models_48, LocalGP_likelihoods_48 = Training.train_one_row_LocalGP_Parallel(train_x, train_y, 
-                                                                              test_y, row_idx, covar_type = 'RQ', k_num = 100,
-                                                                              lr=0.025, num_iterations=5000, 
-                                                                              patience=10, device=Device)
+
+LocalGP_models, LocalGP_likelihoods = Training.train_one_row_LocalGP_Parallel(train_x, train_y, 
+                                                                                    test_y, row_idx, covar_type = 'RBF', k_num = 100,
+                                                                                    lr=0.025, num_iterations=5000, 
+                                                                                    patience=10, device=Device)
 
 
 full_test_preds = Prediction.full_preds(LocalGP_models_48, LocalGP_likelihoods_48, test_x[row_idx,:].unsqueeze(0).to(Device)).cpu().detach().numpy()
