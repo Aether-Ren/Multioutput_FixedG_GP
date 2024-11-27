@@ -71,7 +71,7 @@ full_estimated_params = estimated_params.detach().numpy()
 
 
 mcmc_result_Normal = Estimation.run_mcmc_Normal(Prediction.full_preds, LocalGP_models, LocalGP_likelihoods, row_idx, test_y, local_train_x, 
-                                                num_sampling=4000, warmup_step=1000, num_chains=2)
+                                                num_sampling=4000, warmup_step=1000, num_chains=1)
 
 
 
@@ -112,7 +112,7 @@ for row_idx in range(1,2):
 
     preds_tmp = Prediction.full_preds(LocalGP_models, LocalGP_likelihoods, test_x[row_idx,:].unsqueeze(0).to(Device)).cpu().detach().numpy()
     full_test_preds = np.vstack((full_test_preds, preds_tmp))
-    np.save('FixedG/LocalGP_full_preds.npy', full_test_preds)
+    np.save('Result/LocalGP_full_preds.npy', full_test_preds)
 
     bounds = bound.get_bounds(local_train_x)
 
@@ -120,11 +120,11 @@ for row_idx in range(1,2):
                                                        num_starts=5, num_iterations=2000, lr=0.01, patience=50, attraction_threshold=0.1, repulsion_strength=0.1, device=Device)
 
     full_estimated_params = np.vstack((full_estimated_params, estimated_params_tmp.detach().numpy()))
-    np.save('FixedG/LocalGP_full_estimated_params.npy', full_estimated_params)
+    np.save('Result/LocalGP_full_estimated_params.npy', full_estimated_params)
 
 
     mcmc_result_Normal = Estimation.run_mcmc_Normal(Prediction.full_preds, LocalGP_models, LocalGP_likelihoods, row_idx, test_y, local_train_x, 
-                                                    num_sampling=4000, warmup_step=1000, num_chains=2)
+                                                    num_sampling=4000, warmup_step=1000, num_chains=1)
 
     posterior_samples_Normal = mcmc_result_Normal.get_samples()
 
@@ -139,7 +139,7 @@ for row_idx in range(1,2):
         posterior_means_array_tmp[idx] = mean_value
 
     posterior_means_array = np.vstack((posterior_means_array, posterior_means_array_tmp))
-    np.save('FixedG/LocalGP_posterior_means.npy', posterior_means_array)
+    np.save('Result/LocalGP_posterior_means.npy', posterior_means_array)
     
 
 
