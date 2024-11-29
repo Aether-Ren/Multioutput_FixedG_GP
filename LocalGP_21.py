@@ -30,8 +30,8 @@ import GP_functions.FeatureE as FeatureE
 X_train = pd.read_csv('Data/X_train.csv', header=None, delimiter=',').values
 X_test = pd.read_csv('Data/X_test.csv', header=None, delimiter=',').values
 
-Y_train_std = pd.read_csv('Data/Y_train_std.csv', header=None, delimiter=',').values
-Y_test_std = pd.read_csv('Data/Y_test_std.csv', header=None, delimiter=',').values
+Y_train_std = pd.read_csv('Data/Y_train_std_21.csv', header=None, delimiter=',').values
+Y_test_std = pd.read_csv('Data/Y_test_std_21.csv', header=None, delimiter=',').values
 
 train_x = torch.tensor(X_train, dtype=torch.float32)
 test_x = torch.tensor(X_test, dtype=torch.float32)
@@ -64,7 +64,8 @@ full_test_preds = Prediction.full_preds(LocalGP_models, LocalGP_likelihoods, tes
 bounds = bound.get_bounds(local_train_x)
 
 estimated_params, func_loss = Estimation.multi_start_estimation(LocalGP_models, LocalGP_likelihoods, row_idx, test_y, bounds, Estimation.estimate_params_Adam, 
-                                                       num_starts=5, num_iterations=2000, lr=0.01, patience=50, attraction_threshold=0.1, repulsion_strength=0.1, device=Device)
+                                                                num_starts=5, num_iterations=2000, lr=0.01, patience=50, 
+                                                                attraction_threshold=0.1, repulsion_strength=0.1, device=Device)
 
 
 full_estimated_params = estimated_params.detach().numpy()
@@ -98,8 +99,8 @@ np.save('Result/LocalGP_full_estimated_params.npy', full_estimated_params)
 np.save('Result/LocalGP_posterior_means.npy', posterior_means_array)
 
 
-for row_idx in range(1,test_y.shape[0]):
-# for row_idx in range(1,2):
+# for row_idx in range(1,test_y.shape[0]):
+for row_idx in range(1,2):
     input_point = test_y[row_idx,:]
 
     local_train_x, local_train_y = Tools.find_k_nearest_neighbors_CPU(input_point, train_x, train_y, k = 100)
