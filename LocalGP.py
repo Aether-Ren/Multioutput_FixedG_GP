@@ -70,7 +70,7 @@ estimated_params, func_loss = Estimation.multi_start_estimation(LocalGP_models, 
 full_estimated_params = estimated_params.detach().numpy()
 
 
-mcmc_result_Normal = Estimation.run_mcmc_Normal(Prediction.full_preds, LocalGP_models, LocalGP_likelihoods, row_idx, test_y, local_train_x, 
+mcmc_result_Normal = Estimation.run_mcmc_Uniform(Prediction.full_preds, LocalGP_models, LocalGP_likelihoods, row_idx, test_y, local_train_x, 
                                                 num_sampling=4000, warmup_step=1000, num_chains=1)
 
 
@@ -123,7 +123,7 @@ for row_idx in range(1,test_y.shape[0]):
     np.save('Result/LocalGP_full_estimated_params.npy', full_estimated_params)
 
 
-    mcmc_result_Normal = Estimation.run_mcmc_Normal(Prediction.full_preds, LocalGP_models, LocalGP_likelihoods, row_idx, test_y, local_train_x, 
+    mcmc_result_Normal = Estimation.run_mcmc_Uniform(Prediction.full_preds, LocalGP_models, LocalGP_likelihoods, row_idx, test_y, local_train_x, 
                                                     num_sampling=4000, warmup_step=1000, num_chains=1)
 
     posterior_samples_Normal = mcmc_result_Normal.get_samples()
