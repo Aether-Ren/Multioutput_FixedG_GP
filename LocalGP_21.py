@@ -159,4 +159,4 @@ for row_idx in range(1,test_y_21.shape[0]):
 
 
 
-# nohup python LocalGP.py > LocalGPout.log 2>&1 &
+# nohup python LocalGP_21.py > LocalGP_21out.log 2>&1 &
