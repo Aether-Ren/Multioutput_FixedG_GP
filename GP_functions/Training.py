@@ -47,14 +47,15 @@ def train_one_column_LocalGP(local_train_x, local_train_y, covar_type = 'RBF', l
 
     best_loss = float('inf')
     counter = 0
-    iterator = tqdm.tqdm(range(num_iterations))
+    # iterator = tqdm.tqdm(range(num_iterations))
 
-    for i in iterator:
+    # for i in iterator:
+    for i in range(num_iterations):
         optimizer.zero_grad()
         output = model(local_train_x)
         loss = -mll(output, local_train_y)
         loss.backward()
-        iterator.set_postfix(loss=loss.item())
+        # iterator.set_postfix(loss=loss.item())
         optimizer.step()
 
         if loss.item() <= best_loss:
@@ -139,17 +140,18 @@ def train_one_column_VGP(column_idx, full_train_x, full_train_y, inducing_points
 
     best_loss = float('inf')
     counter = 0
-    iterator = tqdm.tqdm(range(num_iterations))
+    # iterator = tqdm.tqdm(range(num_iterations))
 
 
-    for i in iterator:  
+    # for i in iterator:
+    for i in range(num_iterations):
         variational_ngd_optimizer.zero_grad()
         hyperparameter_optimizer.zero_grad()
         output = model(full_train_x)
 
         loss = -mll(output, train_y_column)
         loss.backward()
-        iterator.set_postfix(loss=loss.item())
+        # iterator.set_postfix(loss=loss.item())
         variational_ngd_optimizer.step()
         hyperparameter_optimizer.step()
 
@@ -242,15 +244,16 @@ def train_full_MultitaskVGP(train_x, train_y, covar_type = 'Matern3/2', num_late
     best_loss = float('inf')
     counter = 0
 
-    iterator = tqdm.tqdm(range(num_iterations))
+    # iterator = tqdm.tqdm(range(num_iterations))
 
-    for i in iterator:
+    # for i in iterator:
+    for i in range(num_iterations):
         variational_ngd_optimizer.zero_grad()
         hyperparameter_optimizer.zero_grad()
         output = model(train_x)
         loss = -mll(output, train_y)
         loss.backward()
-        iterator.set_postfix(loss=loss.item())
+        # iterator.set_postfix(loss=loss.item())
         variational_ngd_optimizer.step()
         hyperparameter_optimizer.step()
 
@@ -270,14 +273,6 @@ def train_full_MultitaskVGP(train_x, train_y, covar_type = 'Matern3/2', num_late
 
 
 
-
-
-#############################################################################
-## 
-#############################################################################
-
-
-# training NN+SparseGP
 
 
 
@@ -307,14 +302,15 @@ def train_one_row_MultitaskGP(local_train_x, local_train_y, n_tasks, covar_type 
     
     best_loss = float('inf')
     counter = 0
-    iterator = tqdm.tqdm(range(num_iterations))
+    # iterator = tqdm.tqdm(range(num_iterations))
 
-    for i in iterator:  
+    # for i in iterator:
+    for i in range(num_iterations):
         optimizer.zero_grad()
         output = model(local_train_x)
         loss = -mll(output, local_train_y)
         loss.backward()
-        iterator.set_postfix(loss=loss.item())
+        # iterator.set_postfix(loss=loss.item())
         optimizer.step()
 
         if loss <= best_loss:
@@ -409,13 +405,14 @@ def train_one_row_NNMultitaskGP(local_train_x, local_train_y, n_tasks, feature_e
     best_loss = float('inf')
     counter = 0
 
-    iterator = tqdm.tqdm(range(num_iterations))
-    for i in iterator:  
+    # iterator = tqdm.tqdm(range(num_iterations))
+    # for i in iterator:
+    for i in range(num_iterations):
         optimizer.zero_grad()
         output = model(local_train_x)
         loss = -mll(output, local_train_y)
         loss.backward()
-        iterator.set_postfix(loss=loss.item())
+        # iterator.set_postfix(loss=loss.item())
         optimizer.step()
 
         if loss <= best_loss:
@@ -463,15 +460,15 @@ def train_one_column_NNLocalGP(local_train_x, local_train_y, feature_extractor_c
     best_loss = float('inf')
     counter = 0
 
-    iterator = tqdm.tqdm(range(num_iterations))
+    # iterator = tqdm.tqdm(range(num_iterations))
 
-    for i in iterator:  
-    # for i in range(5000):  
+    # for i in iterator:  
+    for i in range(num_iterations):
         optimizer.zero_grad()
         output = model(local_train_x)
         loss = -mll(output, local_train_y)
         loss.backward()
-        iterator.set_postfix(loss=loss.item())
+        # iterator.set_postfix(loss=loss.item())
         optimizer.step()
 
         if loss <= best_loss:
@@ -524,12 +521,12 @@ def train_one_row_NNLocalGP_Parallel(train_x, train_y, test_y, row_idx, feature_
 #############################################################################
 
 
-def train_DNN_MSE(full_train_x, full_train_y, num_iterations = 50000, device='cuda'):
+def train_DNN_MSE(NN_model, full_train_x, full_train_y, num_iterations = 50000, device='cuda'):
 
     full_train_x = full_train_x.to(device)
     full_train_y = full_train_y.to(device)
 
-    model = NN_models.NN_4(full_train_x, full_train_y)
+    model = NN_model(full_train_x, full_train_y)
 
     model = model.to(device)
 
@@ -540,18 +537,17 @@ def train_DNN_MSE(full_train_x, full_train_y, num_iterations = 50000, device='cu
     optimizer = torch.optim.Adam(model.parameters(), lr=0.2)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor = 0.5, patience = 100)
     
-    # patience = 10
-    # best_loss = float('inf')
-    # counter = 0
-    iterator = tqdm.tqdm(range(num_iterations))
+
+    # iterator = tqdm.tqdm(range(num_iterations))
 
 
-    for i in iterator:  
+    # for i in iterator:
+    for i in range(num_iterations):
         optimizer.zero_grad()
         output = model(full_train_x)
         loss = criterion(output, full_train_y)
         loss.backward()
-        iterator.set_postfix(loss=loss.item())
+        # iterator.set_postfix(loss=loss.item())
         optimizer.step()
         scheduler.step(loss)
 
@@ -569,15 +565,14 @@ def train_DNN_MSE(full_train_x, full_train_y, num_iterations = 50000, device='cu
 
 
 
-def train_DNN_4(full_train_x, full_train_y, num_iterations = 50000, device='cuda'):
+def train_DNN_Euclidean(NN_model, full_train_x, full_train_y, num_iterations = 50000, device='cuda'):
     
     full_train_x = full_train_x.to(device)
     full_train_y = full_train_y.to(device)
 
-    model = NN_models.NN_4(full_train_x, full_train_y)
+    model = NN_model(full_train_x, full_train_y)
 
-    # if torch.cuda.is_available():
-    #     model = model.cuda()
+
     model = model.to(device)
     model.train()
 
@@ -600,152 +595,9 @@ def train_DNN_4(full_train_x, full_train_y, num_iterations = 50000, device='cuda
     return model
 
 
-def train_DNN_5(full_train_x, full_train_y, num_iterations = 50000, device='cuda'):
-
-    full_train_x = full_train_x.to(device)
-    full_train_y = full_train_y.to(device)
-
-    model = NN_models.NN_5(full_train_x, full_train_y)
-
-    model = model.to(device)
-
-    model.train()
-
-
-    criterion = Loss_function.euclidean_distance_loss 
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.2)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor = 0.5, patience = 100)
-    iterator = tqdm.tqdm(range(num_iterations))
-
-
-    for i in iterator:  
-        optimizer.zero_grad()
-        output = model(full_train_x)
-        loss = criterion(output, full_train_y)
-        loss.backward()
-        iterator.set_postfix(loss=loss.item())
-        optimizer.step()
-        scheduler.step(loss)
-
-    return model
 
 
 
-def train_DNN_5_1(full_train_x, full_train_y, num_iterations = 50000, device='cuda'):
-    
-    full_train_x = full_train_x.to(device)
-    full_train_y = full_train_y.to(device)
-
-    model = NN_models.NN_5_1(full_train_x, full_train_y)
-    model = model.to(device)
-
-    model.train()
-
-
-    criterion = Loss_function.euclidean_distance_loss 
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.2)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor = 0.5, patience = 100)
-    iterator = tqdm.tqdm(range(num_iterations))
-
-
-    for i in iterator:  
-        optimizer.zero_grad()
-        output = model(full_train_x)
-        loss = criterion(output, full_train_y)
-        loss.backward()
-        iterator.set_postfix(loss=loss.item())
-        optimizer.step()
-        scheduler.step(loss)
-
-    return model
-
-
-def train_DNN_5_2(full_train_x, full_train_y, num_iterations = 50000, device='cuda'):
-    
-    full_train_x = full_train_x.to(device)
-    full_train_y = full_train_y.to(device)
-
-    model = NN_models.NN_5_2(full_train_x, full_train_y)
-
-    model = model.to(device)
-
-    model.train()
-    criterion = torch.nn.GaussianNLLLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.025)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor = 0.5, patience = 100)
-    iterator = tqdm.tqdm(range(num_iterations))
-
-
-    for i in iterator:
-        optimizer.zero_grad()
-        
-        mu, logvar = model(full_train_x)
-        sigma = torch.exp(logvar)  
-        
-        loss = criterion(mu, full_train_y, sigma)
-        
-        loss.backward()
-        iterator.set_postfix(loss=loss.item())
-        optimizer.step()
-        scheduler.step(loss)
-
-
-    return model
-
-# train_size = int(0.7 * len(train_x))
-# indices = np.arange(len(train_x))
-# np.random.shuffle(indices)
-# train_indices = indices[:train_size]
-# val_indices = indices[train_size:]
-
-# train_data_x = train_x[train_indices]
-# train_data_y = train_y[train_indices]
-# val_data_x = train_x[val_indices]
-# val_data_y = train_y[val_indices]
-
-# model = GP_models.DNNModel()
-
-# if torch.cuda.is_available():
-#     model = model.cuda()
-
-
-# criterion = torch.nn.MSELoss() 
-# optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
-
-# patience = 50
-# best_loss = float('inf')
-# counter = 0
-
-# pbar = tqdm.tqdm(range(1500))
-
-# for i in pbar:
-#     model.train()
-#     optimizer.zero_grad()
-#     output = model(train_data_x)
-#     loss = criterion(output, train_data_y)
-#     loss.backward()
-#     optimizer.step()
-
-    
-#     model.eval()
-#     with torch.no_grad():
-#         val_loss = 0
-#         val_output = model(val_data_x)
-#         val_loss = criterion(val_output, val_data_y)
-
-#     print('Train_Loss: %.3f   val_Loss: %.3f' % (
-#         loss.item(),val_loss.item(),
-#     ))
-
-#     if val_loss <= best_loss:
-#         best_loss = val_loss
-#         best_state = model.state_dict()  
-#         counter = 0
-#     else:
-#         counter += 1
-#         if counter >= patience:
-#             model.load_state_dict(best_state)  
-#             break
 
 
 #############################################################################
@@ -771,13 +623,14 @@ def train_full_DGP_2(full_train_x, full_train_y, num_hidden_dgp_dims = 4, induci
     best_loss = float('inf')
     counter = 0
 
-    iterator = tqdm.tqdm(range(num_iterations))
-    for i in iterator:  
+    # iterator = tqdm.tqdm(range(num_iterations))
+    # for i in iterator:
+    for i in range(num_iterations):
         optimizer.zero_grad()
         output = model(full_train_x)
         loss = -mll(output, full_train_y)
         loss.backward()
-        iterator.set_postfix(loss=loss.item())
+        # iterator.set_postfix(loss=loss.item())
         optimizer.step()
         scheduler.step(loss)
 
@@ -813,13 +666,14 @@ def train_full_DGP_3(full_train_x, full_train_y, num_hidden_dgp_dims = [4,4], in
     counter = 0
 
 
-    iterator = tqdm.tqdm(range(num_iterations))
-    for i in iterator:   
+    # iterator = tqdm.tqdm(range(num_iterations))
+    # for i in iterator:
+    for i in range(num_iterations):
         optimizer.zero_grad()
         output = model(full_train_x)
         loss = -mll(output, full_train_y)
         loss.backward()
-        iterator.set_postfix(loss=loss.item())
+        # iterator.set_postfix(loss=loss.item())
         optimizer.step()
         scheduler.step(loss)
 
@@ -834,266 +688,4 @@ def train_full_DGP_3(full_train_x, full_train_y, num_hidden_dgp_dims = [4,4], in
                 break
 
     return model
-
-
-
-def train_full_DGP_4(full_train_x, full_train_y, num_hidden_dgp_dims = [4,4,4], inducing_num = 500, num_iterations = 2000, patiences = 50, device='cuda'):
-
-    full_train_x = full_train_x.to(device)
-    full_train_y = full_train_y.to(device)
-
-    model = GP_models.DeepGP_4(full_train_x.shape, full_train_y, num_hidden_dgp_dims, inducing_num)
-
-    model = model.to(device)
-
-    model.train()
- 
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
-    mll = gpytorch.mlls.DeepApproximateMLL(gpytorch.mlls.VariationalELBO(model.likelihood, model, num_data=full_train_y.size(0)))
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor = 0.5, patience = 10)
-    
-    best_loss = float('inf')
-    counter = 0
-
-    iterator = tqdm.tqdm(range(num_iterations))
-    for i in iterator:  
-        optimizer.zero_grad()
-        output = model(full_train_x)
-        loss = -mll(output, full_train_y)
-        loss.backward()
-        iterator.set_postfix(loss=loss.item())
-        optimizer.step()
-        scheduler.step(loss)
-
-        if loss <= best_loss:
-            best_loss = loss
-            best_state = model.state_dict()  
-            counter = 0
-        else:
-            counter += 1
-            if counter >= patiences:
-                model.load_state_dict(best_state)  
-                break
-
-    return model
-
-
-
-def train_full_DGP_5(full_train_x, full_train_y, num_hidden_dgp_dims = [4,4,4,4], inducing_num = 500, num_iterations = 2000, patiences = 50, device='cuda'):
-
-    full_train_x = full_train_x.to(device)
-    full_train_y = full_train_y.to(device)
-
-    model = GP_models.DeepGP_5(full_train_x.shape, full_train_y, num_hidden_dgp_dims, inducing_num)
-
-    model = model.to(device)
-
-    model.train()
- 
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
-    mll = gpytorch.mlls.DeepApproximateMLL(gpytorch.mlls.VariationalELBO(model.likelihood, model, num_data=full_train_y.size(0)))
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor = 0.5, patience = 10)
-    
-
-    best_loss = float('inf')
-    counter = 0
-
-    iterator = tqdm.tqdm(range(num_iterations))
-    for i in iterator:  
-        optimizer.zero_grad()
-        output = model(full_train_x)
-        loss = -mll(output, full_train_y)
-        loss.backward()
-        iterator.set_postfix(loss=loss.item())
-        optimizer.step()
-        scheduler.step(loss)
-
-        if loss <= best_loss:
-            best_loss = loss
-            best_state = model.state_dict()  
-            counter = 0
-        else:
-            counter += 1
-            if counter >= patiences:
-                model.load_state_dict(best_state)  
-                break
-
-    return model
-
-
-
-
-
-# import GP_models
-
-# train_size = int(0.7 * len(train_x))
-# indices = np.arange(len(train_x))
-# np.random.shuffle(indices)
-# train_indices = indices[:train_size]
-# val_indices = indices[train_size:]
-
-# train_data_x = train_x[train_indices]
-# train_data_y = train_y[train_indices]
-# val_data_x = train_x[val_indices]
-# val_data_y = train_y[val_indices]
-
-# model = GP_models.MultitaskDeepGP(train_data_x.shape, train_data_y, num_hidden_dgp_dims=3)
-
-# if torch.cuda.is_available():
-#     model = model.cuda()
-
-
-# optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
-# mll = gpytorch.mlls.DeepApproximateMLL(gpytorch.mlls.VariationalELBO(model.likelihood, model, num_data=train_y.size(0)))
-
-# patience = 25
-# best_loss = float('inf')
-# counter = 0
-
-
-# for i in range(1000):
-#     model.train()
-#     optimizer.zero_grad()
-#     output = model(train_x)
-#     loss = -mll(output, train_y)
-#     loss.backward()
-#     optimizer.step()
-
-#     model.eval()
-#     with torch.no_grad():
-#         val_loss = 0
-#         val_output = model(val_data_x)
-#         val_loss = -mll(val_output, val_data_y)
-
-#     if val_loss <= best_loss:
-#         best_loss = val_loss
-#         best_state = model.state_dict()  
-#         counter = 0
-#     else:
-#         counter += 1
-#         if counter >= patience:
-#             model.load_state_dict(best_state)  
-#             break
-
-
-
-#############################################################################
-## 
-#############################################################################
-
-# training SparseGP
-
-def train_one_column_sparseGP(column_idx, full_train_x, full_train_y, inducing_points):
-    
-    train_y_column = full_train_y[:, column_idx]
-    
-    likelihood = gpytorch.likelihoods.GaussianLikelihood()
-    model = GP_models.SparseGPModel(full_train_x, train_y_column, likelihood, inducing_points)
-
-    if torch.cuda.is_available():
-        model = model.cuda()
-        likelihood = likelihood.cuda()
-
-    model.train()
-    likelihood.train()
-
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.05)
-
-    mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
-
-    patience = 10
-    best_loss = float('inf')
-    counter = 0
-
-
-    for i in range(5000):  
-        optimizer.zero_grad()
-        output = model(full_train_x)
-        loss = -mll(output, train_y_column)
-        loss.backward()
-        optimizer.step()
-
-        if loss <= best_loss:
-            best_loss = loss
-            best_state = model.state_dict()  
-            counter = 0
-        else:
-            counter += 1
-            if counter >= patience:
-                model.load_state_dict(best_state)  
-                break
-
-    return model, likelihood
-
-
-
-def train_full_SparseGP(train_x, train_y, inducing_points):
-    # Train the all columns of the output
-    Models = []
-    Likelihoods = []
-    for column_idx in range(train_y.shape[1]):
-        model, likelihood = train_one_column_sparseGP(column_idx, train_x, train_y, inducing_points)
-        Models.append(model)
-        Likelihoods.append(likelihood)
-    return Models, Likelihoods
-
-
-#############################################################################
-## 
-#############################################################################
-
-# training VNNGP
-def train_one_column_VNNGP(column_idx, full_train_x, full_train_y):
-    
-    train_y_column = full_train_y[:, column_idx]
-    
-    likelihood = gpytorch.likelihoods.GaussianLikelihood()
-    model = GP_models.VNNGPModel(inducing_points = full_train_x, likelihood=likelihood, k = 100, training_batch_size = 100)
-
-    model.train()
-    likelihood.train()
-
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.05)
-
-    mll = gpytorch.mlls.VariationalELBO(likelihood, model, num_data = train_y_column.size(0))
-    
-    patience = 10
-    best_loss = float('inf')
-    counter = 0
-
-
-    for i in range(5000):  
-        optimizer.zero_grad()
-        output = model(x=None)
-        current_training_indices = model.variational_strategy.current_training_indices
-        y_batch = train_y_column[...,current_training_indices]
-        # if torch.cuda.is_available():
-        #     y_batch = y_batch.cuda()
-        loss = -mll(output, y_batch)
-        loss.backward()
-        optimizer.step()
-
-        if loss <= best_loss:
-            best_loss = loss
-            best_state = model.state_dict()  
-            counter = 0
-        else:
-            counter += 1
-            if counter >= patience:
-                model.load_state_dict(best_state)  
-                break
-
-    return model, likelihood
-
-
-
-def train_full_VNNGP(train_x, train_y):
-    # Train the all columns of the output
-    Models = []
-    Likelihoods = []
-    for column_idx in range(train_y.shape[1]):
-        model, likelihood = train_one_column_VNNGP(column_idx, train_x, train_y)
-        Models.append(model)
-        Likelihoods.append(likelihood)
-    return Models, Likelihoods
 
