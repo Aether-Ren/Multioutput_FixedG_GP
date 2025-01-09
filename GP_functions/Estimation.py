@@ -29,199 +29,6 @@ import arviz as az
 
 
 
-def estimate_params_basinhopping_NM(models, likelihoods, row_idx, test_y, bounds):
-
-    # Use basinhopping to estimate parameters for the GP model.
-
-    def surrogate_loss_wrapped(params):
-        return Loss_function.surrogate_loss_euclid(params, models, likelihoods, row_idx, test_y)
-
-
-    # Define the bounds in the minimizer_kwargs
-    minimizer_kwargs = {"method": "Nelder-Mead", 
-                        "bounds": bounds,
-                        "options": {"adaptive": True}}
-
-    # Initialize the starting point
-    initial_guess = [np.mean([b[0], b[1]]) for b in bounds]
-
-    # Run basinhopping
-    result = basinhopping(surrogate_loss_wrapped, initial_guess, minimizer_kwargs=minimizer_kwargs, 
-                          niter=100, T = 1e-05, stepsize=0.25, niter_success = 20, target_accept_rate = 0.6)
-    
-    return result.x, result.fun
-
-
-def estimate_params_for_one_model_basinhopping_NM(models, likelihoods, row_idx, test_y, bounds):
-
-    # Use basinhopping to estimate parameters for the GP model.
-
-    def surrogate_loss_wrapped(params):
-        return Loss_function.surrogate_loss_for_one_model_euclid(params, models, likelihoods, row_idx, test_y)
-
-
-    # Define the bounds in the minimizer_kwargs
-    minimizer_kwargs = {"method": "Nelder-Mead", 
-                        "bounds": bounds,
-                        "options": {"adaptive": True}}
-
-    # Initialize the starting point
-    initial_guess = [np.mean([b[0], b[1]]) for b in bounds]
-
-    # Run basinhopping
-    result = basinhopping(surrogate_loss_wrapped, initial_guess, minimizer_kwargs=minimizer_kwargs, 
-                          niter=100, T = 1e-05, stepsize=0.25, niter_success = 20, target_accept_rate = 0.6)
-    
-    return result.x, result.fun
-
-
-
-def estimate_params_basinhopping_NM_DNN(models, row_idx, test_y, bounds):
-
-    # Use basinhopping to estimate parameters for the GP model.
-
-    def surrogate_loss_wrapped(params):
-        return Loss_function.surrogate_loss_euclid_DNN(params, models, row_idx, test_y)
-
-
-    # Define the bounds in the minimizer_kwargs
-    minimizer_kwargs = {"method": "Nelder-Mead", 
-                        "bounds": bounds,
-                        "options": {"adaptive": True}}
-
-    # Initialize the starting point
-    initial_guess = [np.mean([b[0], b[1]]) for b in bounds]
-
-    # Run basinhopping
-    result = basinhopping(surrogate_loss_wrapped, initial_guess, minimizer_kwargs=minimizer_kwargs, 
-                          niter=100, T = 1e-05, stepsize=0.25, niter_success = 20, target_accept_rate = 0.6)
-    
-    return result.x, result.fun
-
-
-
-
-def estimate_params_basinhopping_NM_DGP(models, row_idx, test_y, bounds):
-
-    # Use basinhopping to estimate parameters for the GP model.
-
-    def surrogate_loss_wrapped(params):
-        return Loss_function.surrogate_loss_euclid_DGP(params, models, row_idx, test_y)
-
-
-    # Define the bounds in the minimizer_kwargs
-    minimizer_kwargs = {"method": "Nelder-Mead", 
-                        "bounds": bounds,
-                        "options": {"adaptive": True}}
-
-    # Initialize the starting point
-    initial_guess = [np.mean([b[0], b[1]]) for b in bounds]
-
-    # Run basinhopping
-    result = basinhopping(surrogate_loss_wrapped, initial_guess, minimizer_kwargs=minimizer_kwargs, 
-                          niter=100, T = 1e-05, stepsize=0.25, niter_success = 20, target_accept_rate = 0.6)
-    
-    return result.x, result.fun
-
-
-
-
-def estimate_params_basinhopping_NM_VGP(models, likelihoods, row_idx, test_y, bounds):
-
-    # Use basinhopping to estimate parameters for the GP model.
-
-    def surrogate_loss_wrapped(params):
-        return Loss_function.surrogate_loss_euclid_VGP(params, models, likelihoods, row_idx, test_y)
-
-
-    # Define the bounds in the minimizer_kwargs
-    minimizer_kwargs = {"method": "Nelder-Mead", 
-                        "bounds": bounds,
-                        "options": {"adaptive": True}}
-
-    # Initialize the starting point
-    initial_guess = [np.mean([b[0], b[1]]) for b in bounds]
-
-    # Run basinhopping
-    result = basinhopping(surrogate_loss_wrapped, initial_guess, minimizer_kwargs=minimizer_kwargs, 
-                          niter=100, T = 1e-05, stepsize=0.25, niter_success = 20, target_accept_rate = 0.6)
-    
-    return result.x, result.fun
-
-
-
-
-
-
-
-#############################################################################
-## Need to change
-#############################################################################
-
-
-def estimate_params_for_one_model_basinhopping_LBFGSB(models, likelihoods, row_idx, test_y, bounds):
-
-    # Use basinhopping to estimate parameters for the GP model.
-
-    def surrogate_loss_wrapped(params):
-        return Loss_function.surrogate_loss_for_one_model_euclid(params, models, likelihoods, row_idx, test_y)
-
-
-    # Define the bounds in the minimizer_kwargs
-    minimizer_kwargs = {"method": "L-BFGS-B", 
-                        "bounds": bounds,
-                        "options": {"adaptive": True}}
-
-    # Initialize the starting point
-    initial_guess = [np.mean([b[0], b[1]]) for b in bounds]
-
-    # Run basinhopping
-    result = basinhopping(surrogate_loss_wrapped, initial_guess, minimizer_kwargs=minimizer_kwargs, 
-                          niter=100, T = 1e-05, stepsize=0.25, niter_success = 20, target_accept_rate = 0.6)
-    
-    return result.x, result.fun
-
-#############################################################################
-## Adam
-#############################################################################
-
-# def estimate_params_for_one_model_Adam(model, likelihood, row_idx, test_y, initial_guess, num_iterations=1000, lr=0.05, patience=50, device='cpu'):
-
-#     target_y = test_y[row_idx].to(device)
-
-#     target_x = torch.tensor(initial_guess, dtype=torch.float32).to(device).unsqueeze(0).requires_grad_(True)
-
-#     optimizer = torch.optim.Adam([target_x], lr=lr)
-
-#     model.eval()
-#     likelihood.eval()
-
-#     best_loss = float('inf')
-#     counter = 0
-#     iterator = tqdm.tqdm(range(num_iterations))
-
-#     for i in iterator:
-#         optimizer.zero_grad()  
-#         # loss = (likelihood.cpu()(model.cpu()(target_x)).mean - target_y).pow(2).sum()
-#         loss = torch.norm(likelihood.to(device)(model.to(device)(target_x)).mean - target_y, p = 2).sum()
-#         loss.backward(retain_graph=True)
-#         iterator.set_postfix(loss=loss.item())
-#         optimizer.step()
-
-#         if loss.item() < best_loss:
-#             best_loss = loss.item()
-#             best_state = target_x.detach().clone()
-#             counter = 0
-#         else:
-#             counter += 1
-#             if counter >= patience:
-#                 print("Stopping early due to lack of improvement.")
-#                 target_x = best_state
-#                 break
-    
-#     return target_x.squeeze()
-
-
 
 def estimate_params_for_one_model_Adam(model, likelihood, row_idx, test_y, initial_guess, param_ranges, num_iterations=1000, lr=0.05, patience=50, attraction_threshold=0.1, repulsion_strength=0.5, device='cpu'):
     
@@ -235,14 +42,15 @@ def estimate_params_for_one_model_Adam(model, likelihood, row_idx, test_y, initi
 
     best_loss = float('inf')
     counter = 0
-    iterator = tqdm.tqdm(range(num_iterations))
+    # iterator = tqdm.tqdm(range(num_iterations))
 
-    for i in iterator:
+    # for i in iterator:
+    for i in range(num_iterations):
         optimizer.zero_grad()
         
         loss = torch.norm(likelihood.to(device)(model.to(device)(target_x)).mean - target_y, p=2).sum()
         loss.backward(retain_graph=True)
-        iterator.set_postfix(loss=loss.item())
+        # iterator.set_postfix(loss=loss.item())
         optimizer.step()
 
         grad_norm = target_x.grad.data.norm(2).item()
@@ -261,7 +69,7 @@ def estimate_params_for_one_model_Adam(model, likelihood, row_idx, test_y, initi
         else:
             counter += 1
             if counter >= patience:
-                print("Stopping early due to lack of improvement.")
+                # print("Stopping early due to lack of improvement.")
                 target_x = best_state
                 break
     
@@ -270,41 +78,6 @@ def estimate_params_for_one_model_Adam(model, likelihood, row_idx, test_y, initi
 
 
 
-
-# def estimate_params_Adam(Models, Likelihoods, row_idx, test_y, initial_guess, num_iterations=1000, lr=0.05, patience=50, device='cpu'):
-
-#     target_y = test_y[row_idx].to(device)
-#     target_x = torch.tensor(initial_guess, dtype=torch.float32).to(device).unsqueeze(0).requires_grad_(True)
-    
-
-#     optimizer = torch.optim.Adam([target_x], lr=lr)
-    
-#     best_loss = float('inf')
-#     counter = 0
-#     best_state = None
-    
-#     iterator = tqdm.tqdm(range(num_iterations))
-#     for i in iterator:
-#         optimizer.zero_grad()
-#         # loss = (Prediction.full_preds(Models, Likelihoods, target_x) - target_y).pow(2).sum()
-#         loss = torch.norm(Prediction.full_preds(Models, Likelihoods, target_x) - target_y, p = 2).sum()
-#         loss.backward()
-#         optimizer.step()
-        
-#         iterator.set_postfix(loss=loss.item())
-        
-#         if loss.item() < best_loss:
-#             best_loss = loss.item()
-#             best_state = target_x.detach().clone()
-#             counter = 0
-#         else:
-#             counter += 1
-#             if counter >= patience:
-#                 print("Stopping early due to lack of improvement.")
-#                 target_x = best_state
-#                 break
-    
-#     return target_x.squeeze()
 
 
 
@@ -319,8 +92,9 @@ def estimate_params_Adam(Models, Likelihoods, row_idx, test_y, initial_guess, pa
     counter = 0
     best_state = None
     
-    iterator = tqdm.tqdm(range(num_iterations))
-    for i in iterator:
+    # iterator = tqdm.tqdm(range(num_iterations))
+    # for i in iterator:
+    for i in range(num_iterations):
         optimizer.zero_grad()
         
         loss = torch.norm(Prediction.full_preds(Models, Likelihoods, target_x) - target_y, p=2).sum()
@@ -339,7 +113,7 @@ def estimate_params_Adam(Models, Likelihoods, row_idx, test_y, initial_guess, pa
             for idx, (min_val, max_val) in enumerate(param_ranges):
                 target_x[0, idx] = target_x[0, idx].clamp(min_val, max_val)
 
-        iterator.set_postfix(loss=loss.item())
+        # iterator.set_postfix(loss=loss.item())
         
         if loss.item() < best_loss:
             best_loss = loss.item()
@@ -348,7 +122,7 @@ def estimate_params_Adam(Models, Likelihoods, row_idx, test_y, initial_guess, pa
         else:
             counter += 1
             if counter >= patience:
-                print("Stopping early due to lack of improvement.")
+                # print("Stopping early due to lack of improvement.")
                 target_x = best_state
                 break
     
@@ -356,40 +130,7 @@ def estimate_params_Adam(Models, Likelihoods, row_idx, test_y, initial_guess, pa
 
 
 
-# def estimate_params_Adam_VGP(Models, Likelihoods, row_idx, test_y, initial_guess, num_iterations=1000, lr=0.05, patience=50, device='cpu'):
 
-#     target_y = test_y[row_idx].to(device)
-#     target_x = torch.tensor(initial_guess, dtype=torch.float32).to(device).unsqueeze(0).requires_grad_(True)
-    
-
-#     optimizer = torch.optim.Adam([target_x], lr=lr)
-    
-#     best_loss = float('inf')
-#     counter = 0
-#     best_state = None
-    
-#     iterator = tqdm.tqdm(range(num_iterations))
-#     for i in iterator:
-#         optimizer.zero_grad()
-#         # loss = (Prediction.full_preds_for_VGP(Models, Likelihoods, target_x) - target_y).pow(2).sum()
-#         loss = torch.norm(Prediction.full_preds_for_VGP(Models, Likelihoods, target_x) - target_y, p = 2).sum()
-#         loss.backward(retain_graph=True)
-#         optimizer.step()
-        
-#         iterator.set_postfix(loss=loss.item())
-        
-#         if loss.item() < best_loss:
-#             best_loss = loss.item()
-#             best_state = target_x.detach().clone()
-#             counter = 0
-#         else:
-#             counter += 1
-#             if counter >= patience:
-#                 print("Stopping early due to lack of improvement.")
-#                 target_x = best_state
-#                 break
-    
-#     return target_x.squeeze()
 
 
 
@@ -404,8 +145,9 @@ def estimate_params_Adam_VGP(Models, Likelihoods, row_idx, test_y, initial_guess
     counter = 0
     best_state = None
     
-    iterator = tqdm.tqdm(range(num_iterations))
-    for i in iterator:
+    # iterator = tqdm.tqdm(range(num_iterations))
+    # for i in iterator:
+    for i in range(num_iterations):
         optimizer.zero_grad()
         
         loss = torch.norm(Prediction.full_preds_for_VGP(Models, Likelihoods, target_x) - target_y, p=2).sum()
@@ -424,7 +166,7 @@ def estimate_params_Adam_VGP(Models, Likelihoods, row_idx, test_y, initial_guess
             for idx, (min_val, max_val) in enumerate(param_ranges):
                 target_x[0, idx] = target_x[0, idx].clamp(min_val, max_val)
 
-        iterator.set_postfix(loss=loss.item())
+        # iterator.set_postfix(loss=loss.item())
         
         if loss.item() < best_loss:
             best_loss = loss.item()
@@ -433,7 +175,7 @@ def estimate_params_Adam_VGP(Models, Likelihoods, row_idx, test_y, initial_guess
         else:
             counter += 1
             if counter >= patience:
-                print("Stopping early due to lack of improvement.")
+                # print("Stopping early due to lack of improvement.")
                 target_x = best_state
                 break
     
@@ -449,7 +191,7 @@ def multi_start_estimation(model, likelihood, row_idx, test_y, param_ranges, est
     quantiles = np.linspace(0.25, 0.75, num_starts)  
     
     for start in range(num_starts):
-        print(f"Starting optimization run {start+1}/{num_starts}")
+        # print(f"Starting optimization run {start+1}/{num_starts}")
         
         initial_guess = [np.quantile([min_val, max_val], quantiles[start]) for (min_val, max_val) in param_ranges]
 
@@ -469,48 +211,6 @@ def multi_start_estimation(model, likelihood, row_idx, test_y, param_ranges, est
 
 
 
-# def estimate_params_for_DGP_Adam(DGP_model, row_idx, test_y, initial_guess, num_iterations=1000, lr=0.05, patience=50, device='cuda'):
-
-#     target_y = test_y[row_idx].to(device)
-
-#     target_x = torch.tensor(initial_guess, dtype=torch.float32).to(device).unsqueeze(0).requires_grad_(True)
-
-#     optimizer = torch.optim.Adam([target_x], lr=lr)
-
-#     DGP_model.eval()
-
-#     best_loss = float('inf')
-#     counter = 0
-#     iterator = tqdm.tqdm(range(num_iterations))
-
-#     for i in iterator:
-#         optimizer.zero_grad()  
-#         # loss = (DGP_model.predict(target_x)[0] - target_y).pow(2).sum()
-#         loss = torch.norm(DGP_model.predict(target_x)[0] - target_y, p = 2).sum()
-#         loss.backward(retain_graph=True)
-#         iterator.set_postfix(loss=loss.item())
-#         optimizer.step()
-
-#         if loss.item() < best_loss:
-#             best_loss = loss.item()
-#             best_state = target_x.detach().clone()
-#             counter = 0
-#         else:
-#             counter += 1
-#             if counter >= patience:
-#                 print("Stopping early due to lack of improvement.")
-#                 target_x = best_state
-#                 break
-    
-#     return target_x.squeeze()
-
-
-
-
-
-
-
-
 
 
 
@@ -525,9 +225,10 @@ def estimate_params_for_DGP_Adam(DGP_model, row_idx, test_y, initial_guess, para
 
     best_loss = float('inf')
     counter = 0
-    iterator = tqdm.tqdm(range(num_iterations))
+    # iterator = tqdm.tqdm(range(num_iterations))
 
-    for i in iterator:
+    # for i in iterator:
+    for i in range(num_iterations):
         optimizer.zero_grad()
         
         loss = torch.norm(DGP_model.predict(target_x)[0] - target_y, p=2).sum()
@@ -543,7 +244,7 @@ def estimate_params_for_DGP_Adam(DGP_model, row_idx, test_y, initial_guess, para
             for idx, (min_val, max_val) in enumerate(param_ranges):
                 target_x[0, idx] = target_x[0, idx].clamp(min_val, max_val)
 
-        iterator.set_postfix(loss=loss.item())
+        # iterator.set_postfix(loss=loss.item())
         
         if loss.item() < best_loss:
             best_loss = loss.item()
@@ -552,7 +253,7 @@ def estimate_params_for_DGP_Adam(DGP_model, row_idx, test_y, initial_guess, para
         else:
             counter += 1
             if counter >= patience:
-                print("Stopping early due to lack of improvement.")
+                # print("Stopping early due to lack of improvement.")
                 target_x = best_state
                 break
     
@@ -560,38 +261,7 @@ def estimate_params_for_DGP_Adam(DGP_model, row_idx, test_y, initial_guess, para
 
 
 
-# def estimate_params_for_NN_Adam(NN_model, row_idx, test_y, initial_guess, num_iterations=1000, lr=0.05, patience=50, device='cuda'):
 
-#     target_y = test_y[row_idx].to(device)
-
-#     target_x = torch.tensor(initial_guess, dtype=torch.float32).to(device).unsqueeze(0).requires_grad_(True)
-
-#     optimizer = torch.optim.Adam([target_x], lr=lr)
-
-#     best_loss = float('inf')
-#     counter = 0
-#     iterator = tqdm.tqdm(range(num_iterations))
-
-#     for i in iterator:
-#         optimizer.zero_grad()  
-#         # loss = (Prediction.preds_for_DNN(NN_model, target_x) - target_y).pow(2).sum()
-#         loss = torch.norm(Prediction.preds_for_DNN(NN_model, target_x) - target_y, p = 2).sum()
-#         loss.backward(retain_graph=True)
-#         iterator.set_postfix(loss=loss.item())
-#         optimizer.step()
-
-#         if loss.item() < best_loss:
-#             best_loss = loss.item()
-#             best_state = target_x.detach().clone()
-#             counter = 0
-#         else:
-#             counter += 1
-#             if counter >= patience:
-#                 print("Stopping early due to lack of improvement.")
-#                 target_x = best_state
-#                 break
-    
-#     return target_x.squeeze()
 
 
 
@@ -605,9 +275,10 @@ def estimate_params_for_NN_Adam(NN_model, row_idx, test_y, initial_guess, param_
     best_loss = float('inf')
     counter = 0
     best_state = None
-    iterator = tqdm.tqdm(range(num_iterations))
+    # iterator = tqdm.tqdm(range(num_iterations))
 
-    for i in iterator:
+    # for i in iterator:
+    for i in range(num_iterations):
         optimizer.zero_grad()
         loss = torch.norm(Prediction.preds_for_DNN(NN_model, target_x) - target_y, p=2).sum()
         loss.backward(retain_graph=True)
@@ -622,7 +293,7 @@ def estimate_params_for_NN_Adam(NN_model, row_idx, test_y, initial_guess, param_
             for idx, (min_val, max_val) in enumerate(param_ranges):
                 target_x[0, idx] = target_x[0, idx].clamp(min_val, max_val)
 
-        iterator.set_postfix(loss=loss.item())
+        # iterator.set_postfix(loss=loss.item())
         
         if loss.item() < best_loss:
             best_loss = loss.item()
@@ -631,7 +302,7 @@ def estimate_params_for_NN_Adam(NN_model, row_idx, test_y, initial_guess, param_
         else:
             counter += 1
             if counter >= patience:
-                print("Stopping early due to lack of improvement.")
+                # print("Stopping early due to lack of improvement.")
                 target_x = best_state
                 break
     
