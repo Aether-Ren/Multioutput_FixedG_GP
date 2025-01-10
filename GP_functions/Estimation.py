@@ -328,18 +328,18 @@ def run_mcmc_Uniform(Pre_function, Models, Likelihoods, row_idx, test_y, bounds,
         
         sigma = pyro.sample('sigma', dist.HalfNormal(10.0))
         if PCA_func == 'None':
-            mu_value = Pre_function(Models, Likelihoods, theta.unsqueeze(0)).squeeze()
+            mu_value = Pre_function(Models, Likelihoods, theta.unsqueeze(0)).view(-1)
         else:
             components = torch.from_numpy(PCA_func.components_).to(dtype=torch.float32)
             mean_PCA = torch.from_numpy(PCA_func.mean_).to(dtype=torch.float32)
             preds = Pre_function(Models, Likelihoods, theta.unsqueeze(0))
 
-            first_col = preds[0]  
-            remaining_cols = preds[1:] 
+            first_col = preds[0].view(-1)
+            remaining_cols = preds[1:].view(-1)
 
             processed_cols = (torch.matmul(remaining_cols, components) + mean_PCA)
 
-            mu_value = torch.cat([first_col.unsqueeze(1), processed_cols], dim=1).squeeze()
+            mu_value = torch.cat([first_col.unsqueeze(1), processed_cols.unsqueeze(0)], dim=1).view(-1)
 
         
         y_obs = test_y[row_idx, :]
