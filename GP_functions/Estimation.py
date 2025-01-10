@@ -334,8 +334,8 @@ def run_mcmc_Uniform(Pre_function, Models, Likelihoods, row_idx, test_y, bounds,
             mean_PCA = torch.from_numpy(PCA_func.mean_).to(dtype=torch.float32)
             preds = Pre_function(Models, Likelihoods, theta.unsqueeze(0))
 
-            first_col = preds[:, 0]  
-            remaining_cols = preds[:, 1:] 
+            first_col = preds[0]  
+            remaining_cols = preds[1:] 
 
             processed_cols = (torch.matmul(remaining_cols, components) + mean_PCA)
 
