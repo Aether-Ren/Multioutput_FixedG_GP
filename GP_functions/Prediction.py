@@ -27,7 +27,7 @@ def preds_for_one_model(model, likelihood, xxx):
     likelihood.eval()
     # with torch.no_grad(),gpytorch.settings.fast_pred_var():
     preds = likelihood(model(xxx)).mean
-    return preds.squeeze()
+    return preds.view(-1)
 
 def full_preds(models, likelihoods, xxx):
     # Use the GP model to get a complete prediction of the output
@@ -36,8 +36,7 @@ def full_preds(models, likelihoods, xxx):
     for i in range(1, len(models)):
         preds = preds_for_one_model(models[i], likelihoods[i],xxx).unsqueeze(1)
         full_preds_point = torch.cat((full_preds_point, preds), 1)
-    return full_preds_point.squeeze()
-
+    return full_preds_point.view(-1)
 
 
 #############################################################################
@@ -51,7 +50,7 @@ def preds_for_VGP(model, likelihood, xxx):
     likelihood.eval()
     # with torch.no_grad():
     preds = model(xxx).mean
-    return preds
+    return preds.view(-1)
 
 def full_preds_for_VGP(models, likelihoods, xxx):
     # Use the GP model to get a complete prediction of the output
@@ -60,7 +59,7 @@ def full_preds_for_VGP(models, likelihoods, xxx):
     for i in range(1, len(models)):
         preds = preds_for_VGP(models[i], likelihoods[i],xxx).unsqueeze(1)
         full_preds_point = torch.cat((full_preds_point, preds), 1)
-    return full_preds_point.squeeze()
+    return full_preds_point.view(-1)
 
 #############################################################################
 ## 
