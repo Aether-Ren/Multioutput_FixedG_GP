@@ -87,7 +87,7 @@ for row_idx in range(test_y_21.shape[0]):
 
     mcmc_result_Uniform = Estimation.run_mcmc_Uniform(
         Prediction.full_preds, LocalGP_models, LocalGP_likelihoods, 
-        row_idx, test_y, local_train_x, 
+        row_idx, test_y, bounds, 
         PCA_func=pca_20, 
         num_sampling=4000, warmup_step=1000, num_chains=1
     )
