@@ -441,6 +441,8 @@ class MultitaskVariationalGP(gpytorch.models.ApproximateGP):
 
 
 
+
+
 #############################################################################
 ## Set up the model structure (DeepGP)
 #############################################################################
