@@ -244,16 +244,16 @@ def train_full_MultitaskVGP(train_x, train_y, covar_type = 'Matern3/2', num_late
     best_loss = float('inf')
     counter = 0
 
-    # iterator = tqdm.tqdm(range(num_iterations))
+    iterator = tqdm.tqdm(range(num_iterations))
 
-    # for i in iterator:
-    for i in range(num_iterations):
+    for i in iterator:
+    # for i in range(num_iterations):
         variational_ngd_optimizer.zero_grad()
         hyperparameter_optimizer.zero_grad()
         output = model(train_x)
         loss = -mll(output, train_y)
         loss.backward()
-        # iterator.set_postfix(loss=loss.item())
+        iterator.set_postfix(loss=loss.item())
         variational_ngd_optimizer.step()
         hyperparameter_optimizer.step()
 
@@ -623,14 +623,14 @@ def train_full_DGP_2(full_train_x, full_train_y, num_hidden_dgp_dims = 4, induci
     best_loss = float('inf')
     counter = 0
 
-    # iterator = tqdm.tqdm(range(num_iterations))
-    # for i in iterator:
-    for i in range(num_iterations):
+    iterator = tqdm.tqdm(range(num_iterations))
+    for i in iterator:
+    # for i in range(num_iterations):
         optimizer.zero_grad()
         output = model(full_train_x)
         loss = -mll(output, full_train_y)
         loss.backward()
-        # iterator.set_postfix(loss=loss.item())
+        iterator.set_postfix(loss=loss.item())
         optimizer.step()
         scheduler.step(loss)
 

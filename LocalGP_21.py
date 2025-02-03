@@ -48,6 +48,8 @@ pca_20 = PCA(n_components = 20)
 
 pca_20.fit(train_y[:,1:])
 
+torch.set_default_dtype(torch.float32)
+
 ####################################################################
 
 Device = 'cpu'
@@ -89,7 +91,7 @@ for row_idx in range(test_y_21.shape[0]):
         Prediction.full_preds, LocalGP_models, LocalGP_likelihoods, 
         row_idx, test_y, bounds, 
         PCA_func=pca_20, 
-        num_sampling=1600, warmup_step=400, num_chains=1
+        num_sampling=800, warmup_step=400, num_chains=1
     )
     posterior_samples_Uniform = mcmc_result_Uniform.get_samples()
 

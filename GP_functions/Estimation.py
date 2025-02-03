@@ -184,16 +184,52 @@ def estimate_params_Adam_VGP(Models, Likelihoods, row_idx, test_y, initial_guess
 
 
 
+# def multi_start_estimation(model, likelihood, row_idx, test_y, param_ranges, estimate_function, num_starts=5, num_iterations=1000, lr=0.05, patience=50, attraction_threshold=0.1, repulsion_strength=0.1, device='cpu'):
+#     best_overall_loss = float('inf')
+#     best_overall_state = None
+
+#     quantiles = np.linspace(0.25, 0.75, num_starts)  
+    
+#     for start in range(num_starts):
+#         # print(f"Starting optimization run {start+1}/{num_starts}")
+        
+#         initial_guess = [np.quantile([min_val, max_val], quantiles[start]) for (min_val, max_val) in param_ranges]
+
+#         estimated_params, loss = estimate_function(
+#             model, likelihood, row_idx, test_y, initial_guess, param_ranges,
+#             num_iterations=num_iterations, lr=lr, patience=patience,
+#             attraction_threshold=attraction_threshold, repulsion_strength=repulsion_strength, device=device
+#         )
+
+#         if loss < best_overall_loss:
+#             best_overall_loss = loss
+#             best_overall_state = estimated_params
+
+#     return best_overall_state, best_overall_loss
+
+
+
+
 def multi_start_estimation(model, likelihood, row_idx, test_y, param_ranges, estimate_function, num_starts=5, num_iterations=1000, lr=0.05, patience=50, attraction_threshold=0.1, repulsion_strength=0.1, device='cpu'):
     best_overall_loss = float('inf')
     best_overall_state = None
 
-    quantiles = np.linspace(0.25, 0.75, num_starts)  
-    
+    dim = len(param_ranges)
+    sobol = torch.quasirandom.SobolEngine(dim, scramble=False)
+    sobol_samples = sobol.draw(num_starts)  # shape: [num_starts, dim]
+
     for start in range(num_starts):
-        # print(f"Starting optimization run {start+1}/{num_starts}")
-        
-        initial_guess = [np.quantile([min_val, max_val], quantiles[start]) for (min_val, max_val) in param_ranges]
+        sample = sobol_samples[start]
+
+        initial_guess = [
+            min_val + s.item() * (max_val - min_val)
+            for s, (min_val, max_val) in zip(sample, param_ranges)
+        ]
+
+        # initial_guess = []
+        # for i, (min_val, max_val) in enumerate(param_ranges):
+        #     guess = min_val + sample[i].item() * (max_val - min_val)
+        #     initial_guess.append(guess)
 
         estimated_params, loss = estimate_function(
             model, likelihood, row_idx, test_y, initial_guess, param_ranges,
@@ -205,10 +241,7 @@ def multi_start_estimation(model, likelihood, row_idx, test_y, param_ranges, est
             best_overall_loss = loss
             best_overall_state = estimated_params
 
-    return best_overall_state, best_overall_loss
-
-
-
+    return best_overall_state.detach().numpy(), best_overall_loss
 
 
 
@@ -316,47 +349,87 @@ def estimate_params_for_NN_Adam(NN_model, row_idx, test_y, initial_guess, param_
 #############################################
 
 
-def run_mcmc_Uniform(Pre_function, Models, Likelihoods, row_idx, test_y, bounds, PCA_func = 'None', num_sampling=2000, warmup_step=1000, num_chains=1):
+def run_mcmc_Uniform(Pre_function, Models, Likelihoods, row_idx, test_y, bounds, PCA_func='None', num_sampling=2000, warmup_step=1000, num_chains=1):
+    test_y = test_y.to(dtype=torch.float32)
+    bounds = [(torch.tensor(b[0], dtype=torch.float32), torch.tensor(b[1], dtype=torch.float32)) for b in bounds]
+
+    if PCA_func != 'None':
+        components = torch.from_numpy(PCA_func.components_).to(dtype=torch.float32)
+        mean_PCA = torch.from_numpy(PCA_func.mean_).to(dtype=torch.float32)
+    
     def model():
+
         params = []
-        
         for i, (min_val, max_val) in enumerate(bounds):
             param_i = pyro.sample(f'param_{i}', dist.Uniform(min_val, max_val))
             params.append(param_i)
         
         theta = torch.stack(params)
-        
+
         sigma = pyro.sample('sigma', dist.HalfNormal(10.0))
+
         if PCA_func == 'None':
             mu_value = Pre_function(Models, Likelihoods, theta.unsqueeze(0)).view(-1)
         else:
-            components = torch.from_numpy(PCA_func.components_).to(dtype=torch.float32)
-            mean_PCA = torch.from_numpy(PCA_func.mean_).to(dtype=torch.float32)
             preds = Pre_function(Models, Likelihoods, theta.unsqueeze(0))
-
             first_col = preds[0].view(-1)
             remaining_cols = preds[1:].view(-1)
-
             processed_cols = (torch.matmul(remaining_cols, components) + mean_PCA)
-
             mu_value = torch.cat([first_col.unsqueeze(1), processed_cols.unsqueeze(0)], dim=1).view(-1)
 
-        
         y_obs = test_y[row_idx, :]
-        
         pyro.sample('obs', dist.Normal(mu_value, sigma), obs=y_obs)
 
     nuts_kernel = NUTS(model)
     mcmc = MCMC(nuts_kernel, num_samples=num_sampling, warmup_steps=warmup_step, num_chains=num_chains)
     mcmc.run()
 
-    # posterior_samples = mcmc.get_samples()
-
-    # idata = az.from_pyro(mcmc)
-
-    # summary = az.summary(idata, hdi_prob=0.95)
-    
     return mcmc
+
+
+
+
+# def run_mcmc_Uniform(Pre_function, Models, Likelihoods, row_idx, test_y, bounds, PCA_func = 'None', num_sampling=2000, warmup_step=1000, num_chains=1):
+#     def model():
+#         params = []
+        
+#         for i, (min_val, max_val) in enumerate(bounds):
+#             param_i = pyro.sample(f'param_{i}', dist.Uniform(min_val, max_val))
+#             params.append(param_i)
+        
+#         theta = torch.stack(params)
+        
+#         sigma = pyro.sample('sigma', dist.HalfNormal(10.0))
+#         if PCA_func == 'None':
+#             mu_value = Pre_function(Models, Likelihoods, theta.unsqueeze(0)).view(-1)
+#         else:
+#             components = torch.from_numpy(PCA_func.components_).to(dtype=torch.float32)
+#             mean_PCA = torch.from_numpy(PCA_func.mean_).to(dtype=torch.float32)
+#             preds = Pre_function(Models, Likelihoods, theta.unsqueeze(0))
+
+#             first_col = preds[0].view(-1)
+#             remaining_cols = preds[1:].view(-1)
+
+#             processed_cols = (torch.matmul(remaining_cols, components) + mean_PCA)
+
+#             mu_value = torch.cat([first_col.unsqueeze(1), processed_cols.unsqueeze(0)], dim=1).view(-1)
+
+        
+#         y_obs = test_y[row_idx, :]
+        
+#         pyro.sample('obs', dist.Normal(mu_value, sigma), obs=y_obs)
+
+#     nuts_kernel = NUTS(model)
+#     mcmc = MCMC(nuts_kernel, num_samples=num_sampling, warmup_steps=warmup_step, num_chains=num_chains)
+#     mcmc.run()
+
+#     # posterior_samples = mcmc.get_samples()
+
+#     # idata = az.from_pyro(mcmc)
+
+#     # summary = az.summary(idata, hdi_prob=0.95)
+    
+#     return mcmc
 
 
 def run_mcmc(Pre_function, Models, Likelihoods, row_idx, test_y, bounds, PCA_func='None', num_sampling=2000, warmup_step=1000, num_chains=1):
