@@ -349,13 +349,13 @@ def estimate_params_for_NN_Adam(NN_model, row_idx, test_y, initial_guess, param_
 #############################################
 
 
-def run_mcmc_Uniform(Pre_function, Models, Likelihoods, row_idx, test_y, bounds, PCA_func='None', num_sampling=2000, warmup_step=1000, num_chains=1):
+def run_mcmc_Uniform(Pre_function, Models, Likelihoods, row_idx, test_y, bounds, num_sampling=2000, warmup_step=1000, num_chains=1):
     test_y = test_y.to(dtype=torch.float32)
     bounds = [(torch.tensor(b[0], dtype=torch.float32), torch.tensor(b[1], dtype=torch.float32)) for b in bounds]
 
-    if PCA_func != 'None':
-        components = torch.from_numpy(PCA_func.components_).to(dtype=torch.float32)
-        mean_PCA = torch.from_numpy(PCA_func.mean_).to(dtype=torch.float32)
+    # if PCA_func != 'None':
+    #     components = torch.from_numpy(PCA_func.components_).to(dtype=torch.float32)
+    #     mean_PCA = torch.from_numpy(PCA_func.mean_).to(dtype=torch.float32)
     
     def model():
 
@@ -366,19 +366,21 @@ def run_mcmc_Uniform(Pre_function, Models, Likelihoods, row_idx, test_y, bounds,
         
         theta = torch.stack(params)
 
-        sigma = pyro.sample('sigma', dist.HalfNormal(10.0))
+        # sigma = pyro.sample('sigma', dist.HalfNormal(10.0))
 
-        if PCA_func == 'None':
-            mu_value = Pre_function(Models, Likelihoods, theta.unsqueeze(0)).view(-1)
-        else:
-            preds = Pre_function(Models, Likelihoods, theta.unsqueeze(0))
-            first_col = preds[0].view(-1)
-            remaining_cols = preds[1:].view(-1)
-            processed_cols = (torch.matmul(remaining_cols, components) + mean_PCA)
-            mu_value = torch.cat([first_col.unsqueeze(1), processed_cols.unsqueeze(0)], dim=1).view(-1)
+        # if PCA_func == 'None':
+        #     mu_value = Pre_function(Models, Likelihoods, theta.unsqueeze(0)).view(-1)
+        # else:
+        #     preds = Pre_function(Models, Likelihoods, theta.unsqueeze(0))
+        #     first_col = preds[0].view(-1)
+        #     remaining_cols = preds[1:].view(-1)
+        #     processed_cols = (torch.matmul(remaining_cols, components) + mean_PCA)
+        #     mu_value = torch.cat([first_col.unsqueeze(1), processed_cols.unsqueeze(0)], dim=1).view(-1)
+
+        gp_pred = Pre_function(Models, Likelihoods, theta.unsqueeze(0))
 
         y_obs = test_y[row_idx, :]
-        pyro.sample('obs', dist.Normal(mu_value, sigma), obs=y_obs)
+        pyro.sample('obs', gp_pred, obs=y_obs)
 
     nuts_kernel = NUTS(model)
     mcmc = MCMC(nuts_kernel, num_samples=num_sampling, warmup_steps=warmup_step, num_chains=num_chains)
@@ -449,20 +451,21 @@ def run_mcmc(Pre_function, Models, Likelihoods, row_idx, test_y, bounds, PCA_fun
         
         theta = torch.stack(params)
         
-        sigma = pyro.sample('sigma', dist.HalfNormal(10.0))
+        # sigma = pyro.sample('sigma', dist.HalfNormal(10.0))
 
-        if PCA_func == 'None':
-            mu_value = Pre_function(Models, Likelihoods, theta.unsqueeze(0)).squeeze()
-        else:
-            components = torch.from_numpy(PCA_func.components_).to(dtype=torch.float32)
-            mean_PCA = torch.from_numpy(PCA_func.mean_).to(dtype=torch.float32)
-            preds = Pre_function(Models, Likelihoods, theta.unsqueeze(0))
+        # if PCA_func == 'None':
+        #     mu_value = Pre_function(Models, Likelihoods, theta.unsqueeze(0)).squeeze()
+        # else:
+        #     components = torch.from_numpy(PCA_func.components_).to(dtype=torch.float32)
+        #     mean_PCA = torch.from_numpy(PCA_func.mean_).to(dtype=torch.float32)
+        #     preds = Pre_function(Models, Likelihoods, theta.unsqueeze(0))
             
-            mu_value = (torch.matmul(preds, components) + mean_PCA).squeeze()
+        #     mu_value = (torch.matmul(preds, components) + mean_PCA).squeeze()
+
+        gp_pred = Pre_function(Models, Likelihoods, theta.unsqueeze(0))
 
         y_obs = test_y[row_idx, :]
-        
-        pyro.sample('obs', dist.Normal(mu_value, sigma), obs=y_obs)
+        pyro.sample('obs', gp_pred, obs=y_obs)
 
 
     nuts_kernel = NUTS(model)
@@ -473,7 +476,7 @@ def run_mcmc(Pre_function, Models, Likelihoods, row_idx, test_y, bounds, PCA_fun
 
 
 
-def run_mcmc_Normal(Pre_function, Models, Likelihoods, row_idx, test_y, local_train_x, PCA_func = 'None', num_sampling=2000, warmup_step=1000, num_chains=1):
+def run_mcmc_Normal(Pre_function, Models, Likelihoods, row_idx, test_y, local_train_x, num_sampling=2000, warmup_step=1000, num_chains=1):
     def model():
         params = []
         
@@ -486,26 +489,27 @@ def run_mcmc_Normal(Pre_function, Models, Likelihoods, row_idx, test_y, local_tr
         
         theta = torch.stack(params)
         
-        sigma = pyro.sample('sigma', dist.HalfNormal(10.0))
+        # sigma = pyro.sample('sigma', dist.HalfNormal(10.0))
         
-        if PCA_func == 'None':
-            mu_value = Pre_function(Models, Likelihoods, theta.unsqueeze(0)).squeeze()
-        else:
-            components = torch.from_numpy(PCA_func.components_).to(dtype=torch.float32)
-            mean_PCA = torch.from_numpy(PCA_func.mean_).to(dtype=torch.float32)
-            preds = Pre_function(Models, Likelihoods, theta.unsqueeze(0))
+        # if PCA_func == 'None':
+        #     mu_value = Pre_function(Models, Likelihoods, theta.unsqueeze(0)).squeeze()
+        # else:
+        #     components = torch.from_numpy(PCA_func.components_).to(dtype=torch.float32)
+        #     mean_PCA = torch.from_numpy(PCA_func.mean_).to(dtype=torch.float32)
+        #     preds = Pre_function(Models, Likelihoods, theta.unsqueeze(0))
 
-            first_col = preds[:, 0]  
-            remaining_cols = preds[:, 1:] 
+        #     first_col = preds[:, 0]  
+        #     remaining_cols = preds[:, 1:] 
 
-            processed_cols = (torch.matmul(remaining_cols, components) + mean_PCA)
+        #     processed_cols = (torch.matmul(remaining_cols, components) + mean_PCA)
 
-            mu_value = torch.cat([first_col.unsqueeze(1), processed_cols], dim=1).squeeze()
+        #     mu_value = torch.cat([first_col.unsqueeze(1), processed_cols], dim=1).squeeze()
             
         
+        gp_pred = Pre_function(Models, Likelihoods, theta.unsqueeze(0))
+
         y_obs = test_y[row_idx, :]
-        
-        pyro.sample('obs', dist.Normal(mu_value, sigma), obs=y_obs)
+        pyro.sample('obs', gp_pred, obs=y_obs)
 
     nuts_kernel = NUTS(model)
     mcmc = MCMC(nuts_kernel, num_samples=num_sampling, warmup_steps=warmup_step, num_chains=num_chains)
