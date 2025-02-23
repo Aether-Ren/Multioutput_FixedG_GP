@@ -16,13 +16,15 @@ import gpytorch
 #############################################################################
 ## 
 #############################################################################
+def preds_distribution(model, likelihood, xxx):
+    model.eval()
+    likelihood.eval()
+    preds = likelihood(model(xxx))
+    return preds
+
 
 def preds_for_one_model(model, likelihood, xxx):
     # Prediction of a column of the local data
-    """
-    Applicable Models: MultitaskGP, MultitaskVGP
-    """
-    
     model.eval()
     likelihood.eval()
     # with torch.no_grad(),gpytorch.settings.fast_pred_var():
