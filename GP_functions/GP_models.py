@@ -12,7 +12,7 @@ Description: Various Gaussian process models based on GpyTorch
 import torch
 import gpytorch
 import GP_functions.FeatureE as FeatureE
-
+import GP_functions.Tools as Tools
 
 #############################################################################
 ## Set up the model structure (LocalGP, SparseGP, MultitaskGP)
@@ -383,8 +383,8 @@ class MultitaskVariationalGP(gpytorch.models.ApproximateGP):
     def __init__(self, train_x, train_y, num_latents = 8, num_inducing = 100, covar_type = 'Matern3/2'):
 
         # inducing_points = torch.rand(num_latents, num_inducing, train_x.shape[1]) * (5 - 0.1) + 0.1
-        # inducing_points = train_x[torch.randint(0, train_x.size(0), (num_latents, num_inducing))]
-        inducing_points = train_x[:num_inducing].unsqueeze(0).expand(num_latents, -1, -1)
+        inducing_points = Tools.select_inducing_points_with_pca(train_x, train_y, num_inducing, num_latents)
+        # inducing_points = train_x[:num_inducing].unsqueeze(0).expand(num_latents, -1, -1)
 
         variational_distribution = gpytorch.variational.NaturalVariationalDistribution(
             inducing_points.size(-2), batch_shape=torch.Size([num_latents])
