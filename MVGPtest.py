@@ -59,45 +59,65 @@ test_y = torch.tensor(Y_test_std, dtype=torch.float32)
 
 Device = 'cpu'
 
-num_latents_list = [8, 10, 12, 14]
-num_inducing_list = [100, 150, 175, 200]
 
-best_mse = float('inf')
-best_params = None
-results = []  # 存储所有成功组合及对应的 mse
+import multiprocessing as mp
+import time
+def train_model(covar_type, num_latents, num_inducing, return_dict):
+    try:
+        # 调用训练函数（示例代码，根据实际情况修改）
+        MVGP_models, MVGP_likelihoods = Training.train_full_MultitaskVGP(
+            train_x, train_y_21,
+            covar_type=covar_type,
+            num_latents=num_latents,
+            num_inducing=num_inducing,
+            lr_hyper=0.05,
+            lr_variational=0.05,
+            num_iterations=5000,
+            patience=50,
+            device=Device
+        )
+        # 得到预测值并计算均方误差
+        full_test_preds_MVGP = Prediction.preds_for_one_model(
+            MVGP_models, MVGP_likelihoods, test_x.to(Device)
+        ).cpu().detach().numpy()
+        mse = np.mean((full_test_preds_MVGP.reshape(120, 21) - test_y_21.numpy()) ** 2)
+        return_dict['mse'] = mse
+    except Exception as e:
+        return_dict['error'] = str(e)
 
-for num_latents in num_latents_list:
-    for num_inducing in num_inducing_list:
-        try:
-            # 训练模型
-            MVGP_models, MVGP_likelihoods = Training.train_full_MultitaskVGP(
-                train_x, train_y_21,
-                num_latents=num_latents,
-                num_inducing=num_inducing,
-                lr_hyper=0.05,
-                lr_variational=0.05,
-                num_iterations=5000,
-                patience=50,
-                device=Device
-            )
-            # 得到预测值
-            full_test_preds_MVGP = Prediction.preds_for_one_model(
-                MVGP_models, MVGP_likelihoods, test_x.to(Device)
-            ).cpu().detach().numpy()
+if __name__ == '__main__':
+    manager = mp.Manager()
+    results = []  # 存储所有成功组合及对应的 mse
+    best_mse = float('inf')
+    best_params = None
 
-            # 计算均方误差
-            mse = np.mean((full_test_preds_MVGP.reshape(120, 21) - test_y_21.numpy()) ** 2)
-            results.append((num_latents, num_inducing, mse))
+    num_latents_list = [12, 14, 16, 18]
+    num_inducing_list = [100, 150, 175, 200, 300, 400]
+    covar_type_list = ['Matern5/2', 'RBF', 'RQ']
 
-            if mse < best_mse:
-                best_mse = mse
-                best_params = (num_latents, num_inducing)
-            print(f"组合 num_latents={num_latents}, num_inducing={num_inducing} -> mse: {mse}")
+    for num_latents in num_latents_list:
+        for num_inducing in num_inducing_list:
+            for covar_type in covar_type_list:
+                return_dict = manager.dict()
+                # 将 covar_type 参数加入 args 中
+                p = mp.Process(target=train_model, args=(covar_type, num_latents, num_inducing, return_dict))
+                p.start()
+                # 设置超时时间（单位：秒）
+                p.join(timeout=120)
+                if p.is_alive():
+                    p.terminate()
+                    print(f"组合 covar_type={covar_type}, num_latents={num_latents}, num_inducing={num_inducing} 超时并终止。")
+                    continue
+                if 'error' in return_dict:
+                    print(f"组合 covar_type={covar_type}, num_latents={num_latents}, num_inducing={num_inducing} 训练失败: {return_dict['error']}")
+                    continue
 
-        except Exception as e:
-            # 出现异常，记录并跳过当前参数组合
-            print(f"组合 num_latents={num_latents}, num_inducing={num_inducing} 训练失败: {e}")
-            continue
+                mse = return_dict.get('mse')
+                results.append((covar_type, num_latents, num_inducing, mse))
+                print(f"组合 covar_type={covar_type}, num_latents={num_latents}, num_inducing={num_inducing} -> mse: {mse}")
+                if mse < best_mse:
+                    best_mse = mse
+                    best_params = (covar_type, num_latents, num_inducing)
 
-print("最佳 MSE:", best_mse)
-print("最佳参数组合 (num_latents, num_inducing):", best_params)
+    print("最佳 MSE:", best_mse)
+    print("最佳参数组合 (covar_type, num_latents, num_inducing):", best_params)
