@@ -1,45 +1,20 @@
-class DeepGP_2(gpytorch.models.deep_gps.DeepGP):
-    def __init__(self, train_x_shape, train_y, num_hidden_dgp_dims = 4, inducing_num = 500):
-        num_tasks = train_y.size(-1)
+import torch
+import gpytorch
+import pandas as pd
+import numpy as np
+import tqdm as tqdm
+from torch.utils.data import TensorDataset, DataLoader
 
-        hidden_layer_1 = DGPHiddenLayer(
-            input_dims=train_x_shape[-1],
-            output_dims=num_hidden_dgp_dims,
-            num_inducing=inducing_num, 
-            linear_mean=True
-        )
-
-
-        last_layer = DGPHiddenLayer(
-            input_dims=hidden_layer_1.output_dims,
-            output_dims = num_tasks,
-            num_inducing=inducing_num, 
-            linear_mean=False
-        )
-
-        super().__init__()
-
-        self.hidden_layer_1 = hidden_layer_1
-        self.last_layer = last_layer
-
-        # We're going to use a ultitask likelihood instead of the standard GaussianLikelihood
-        self.likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(num_tasks=num_tasks)
-
-    def forward(self, inputs):
-        hidden_rep1 = self.hidden_layer_1(inputs)
-        output = self.last_layer(hidden_rep1)
-        return output
-    
-    def predict(self, test_x):
-        # with torch.no_grad():
-        preds = self.likelihood(self(test_x)).to_data_independent_dist()
-
-        return preds.mean.mean(0).squeeze(), preds.variance.mean(0).squeeze()
-    
+import GP_functions.Loss_function as Loss_function
+import GP_functions.bound as bound
+import GP_functions.Estimation as Estimation
+import GP_functions.Training as Training
+import GP_functions.Prediction as Prediction
+import GP_functions.GP_models as GP_models
+import GP_functions.Tools as Tools
+import GP_functions.FeatureE as FeatureE
 
 
-
-    
 def evaluate_full_dataset_loss_dgp(model, x_data, y_data, mll, device='cuda', batch_size=1024):
 
     model.eval()
@@ -50,8 +25,8 @@ def evaluate_full_dataset_loss_dgp(model, x_data, y_data, mll, device='cuda', ba
     with torch.no_grad():
         for x_batch, y_batch in data_loader:
             x_batch, y_batch = x_batch.to(device), y_batch.to(device)
-            output = model(x_batch)
-            loss = -mll(output, y_batch)
+            output = model.predict(x_batch)[0]
+            loss = mll(output, y_batch)
             total_loss += loss.item() * x_batch.size(0)
 
     avg_loss = total_loss / len(dataset)
@@ -59,113 +34,100 @@ def evaluate_full_dataset_loss_dgp(model, x_data, y_data, mll, device='cuda', ba
     return avg_loss
 
 
-def train_DGP_2_minibatch(
-    full_train_x, 
-    full_train_y, 
-    num_hidden_dgp_dims=4, 
-    inducing_num=500, 
-    num_iterations=2000, 
-    patience=50, 
-    device='cuda',
-    batch_size=32,
-    eval_every=100,
-    eval_batch_size=1024,
-    lr=0.1
-):
-    """
-    训练Deep GP (2层) 的完整流程，支持小批量训练、早停、全数据集评估和学习率调度。
-    
-    参数说明：
-    - full_train_x, full_train_y: 训练数据
-    - num_hidden_dgp_dims: Deep GP中隐藏层维度
-    - inducing_num: 每层诱导点数量
-    - num_iterations: 总迭代次数上限
-    - patience: 早停耐心值 (评估损失连续多少次不下降就停止)
-    - device: 'cpu' 或 'cuda'
-    - batch_size: 小批量训练时的批量大小
-    - eval_every: 每隔多少次迭代进行一次全数据评估
-    - eval_batch_size: 进行全数据评估时的批量大小
-    - lr: 初始学习率
-    """
-
-    full_train_x = full_train_x.to(device)
-    full_train_y = full_train_y.to(device)
+X_train = pd.read_csv('Data/X_train.csv', header=None, delimiter=',').values
+X_test = pd.read_csv('Data/X_test.csv', header=None, delimiter=',').values
 
 
-    model = GP_models.DeepGP_2(
-        full_train_x.shape, 
-        full_train_y, 
-        num_hidden_dgp_dims, 
-        inducing_num
-    ).to(device)
+Y_train_21 = pd.read_csv('Data/Y_train_std_21.csv', header=None, delimiter=',').values
+Y_test_21 = pd.read_csv('Data/Y_test_std_21.csv', header=None, delimiter=',').values
 
-    model.train()
+Y_train_std = pd.read_csv('Data/Y_train_std.csv', header=None, delimiter=',').values
+Y_test_std = pd.read_csv('Data/Y_test_std.csv', header=None, delimiter=',').values
+
+train_x = torch.tensor(X_train, dtype=torch.float32)
+test_x = torch.tensor(X_test, dtype=torch.float32)
 
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    mll = gpytorch.mlls.DeepApproximateMLL(
-        gpytorch.mlls.VariationalELBO(
-            model.likelihood,
-            model,
-            num_data=full_train_y.size(0)
+train_y_21 = torch.tensor(Y_train_21, dtype=torch.float32)
+test_y_21 = torch.tensor(Y_test_21, dtype=torch.float32)
+
+train_y = torch.tensor(Y_train_std, dtype=torch.float32)
+test_y = torch.tensor(Y_test_std, dtype=torch.float32)
+
+
+Device = 'cuda'
+
+num_hidden_dgp_dims_candidates = [10, 20]
+inducing_num_candidates = [100, 300, 500]
+
+num_iterations = 5000
+patience = 50
+batch_size = 512
+eval_every = 100
+eval_batch_size = 1024
+lr = 0.1
+
+# ============================== #
+
+best_mse = float('inf')
+best_params = None
+best_dgp_model = None
+best_dgp_likelihood = None
+
+# ============================== #
+
+for hidden_dims in num_hidden_dgp_dims_candidates:
+    for inducing_num in inducing_num_candidates:
+        
+
+        dgp_model= Training.train_DGP_2_minibatch(
+            train_x=train_x.to(Device),
+            train_y=train_y_21.to(Device),
+            num_hidden_dgp_dims=hidden_dims,
+            inducing_num=inducing_num,
+            num_iterations=num_iterations,
+            patience=patience,
+            device=Device,
+            batch_size=batch_size,
+            eval_every=eval_every,
+            eval_batch_size=eval_batch_size,
+            lr=lr
         )
-    )
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, 
-        mode='min', 
-        factor=0.5, 
-        patience=25
-    )
+        
+
+        mse = evaluate_full_dataset_loss_dgp(dgp_model, test_x.to(Device), test_y_21.to(Device), torch.nn.MSELoss(), device='cuda', batch_size=20)
+        
+        print(f"HiddenDims={hidden_dims}, InducingNum={inducing_num}, MSE={mse:.4f}")
+        
+
+        if mse < best_mse:
+            best_mse = mse
+            best_params = {
+                'num_hidden_dgp_dims': hidden_dims,
+                'inducing_num': inducing_num
+            }
+            best_dgp_model = dgp_model
 
 
-    best_loss = float('inf')
-    best_state = model.state_dict()
-    counter = 0
+# ============================== #
+
+print("=====================================")
+print(f"best paramater: {best_params}")
+print(f"MSE: {best_mse:.4f}")
+
+# ============================== #
+
+checkpoint = {
+    'model_state_dict': best_dgp_model.state_dict(),
+    'model_params': {
+        'num_hidden_dgp_dims': best_params['num_hidden_dgp_dims'],
+        'inducing_num': best_params['inducing_num'],
+        'input_dim': train_x.size(1),  # 输入特征维度
+        'output_dim': train_y_21.size(1)  # 输出维度 (21)
+    }
+}
 
 
-    data_loader = DataLoader(
-        TensorDataset(full_train_x, full_train_y),
-        batch_size=batch_size,
-        shuffle=True
-    )
-    minibatch_iter = itertools.cycle(data_loader)
-
-
-    with tqdm.tqdm(total=num_iterations, desc="Training DGP_2") as pbar:
-        for step in range(num_iterations):
-            x_batch, y_batch = next(minibatch_iter)
-            x_batch, y_batch = x_batch.to(device), y_batch.to(device)
-
-            optimizer.zero_grad()
-            output = model(x_batch)
-            loss = -mll(output, y_batch)
-            loss.backward()
-            optimizer.step()
-
-            if (step + 1) % eval_every == 0 or (step == num_iterations - 1):
-                current_loss = evaluate_full_dataset_loss_dgp(
-                    model=model,
-                    x_data=full_train_x,
-                    y_data=full_train_y,
-                    mll=mll,
-                    device=device,
-                    batch_size=eval_batch_size
-                )
-                pbar.set_postfix(full_loss=current_loss)
-                
-                scheduler.step(current_loss)
-
-                if current_loss < best_loss:
-                    best_loss = current_loss
-                    best_state = model.state_dict()
-                    counter = 0
-                else:
-                    counter += 1
-                    if counter >= patience:
-                        model.load_state_dict(best_state)
-                        pbar.update(num_iterations - step - 1)
-                        break
-
-            pbar.update(1)
-
-    return model
+save_path = 'best_dgp_checkpoint_21.pth'
+torch.save(checkpoint, save_path)
+print(f"save {save_path}")
