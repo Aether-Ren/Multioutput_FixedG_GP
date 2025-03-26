@@ -13,6 +13,8 @@ import gpytorch
 import tqdm as tqdm
 import pandas as pd
 import numpy as np
+from torch.utils.data import TensorDataset, DataLoader
+import itertools
 
 import GP_functions.GP_models as GP_models
 import GP_functions.NN_models as NN_models
@@ -20,6 +22,8 @@ import GP_functions.Loss_function as Loss_function
 import GP_functions.Tools as Tools
 
 from joblib import Parallel, delayed
+
+
 
 #############################################################################
 ## Training LocalGP
@@ -270,10 +274,115 @@ def train_full_MultitaskVGP(train_x, train_y, covar_type = 'Matern3/2', num_late
     return model, likelihood
 
 
+#################
+##
+################
 
 
+def evaluate_full_dataset_loss(model, likelihood, mll, train_x, train_y, batch_size=1024, device='cpu'):
+    model.eval()
+    likelihood.eval()
+    total_loss = 0.0
+    dataset = TensorDataset(train_x, train_y)
+    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+    
+    with torch.no_grad():
+        for x_batch, y_batch in data_loader:
+            x_batch, y_batch = x_batch.to(device), y_batch.to(device)
+            output = model(x_batch)
+            loss = -mll(output, y_batch)
+            total_loss += loss.item() * x_batch.size(0)
+    
+    avg_loss = total_loss / len(dataset)
+    model.train()
+    likelihood.train()
+    return avg_loss
+
+def train_MultitaskVGP_minibatch(train_x, train_y, covar_type='Matern3/2', num_latents=20, num_inducing=100, 
+                           lr_hyper=0.01, lr_variational=0.1, num_iterations=1000, patience=10, 
+                           device='cpu', batch_size=256, eval_every=100, eval_batch_size=1024):
 
 
+    train_x = train_x.to(device)
+    train_y = train_y.to(device)
+
+    model = GP_models.MultitaskVariationalGP(
+        train_x, train_y, 
+        num_latents=num_latents, 
+        num_inducing=num_inducing, 
+        covar_type=covar_type
+    ).to(device)
+    
+    likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(
+        num_tasks=train_y.shape[1]
+    ).to(device)
+
+    variational_ngd_optimizer = gpytorch.optim.NGD(
+        model.variational_parameters(),
+        num_data=train_y.size(0),
+        lr=lr_variational
+    )
+    
+    hyperparameter_optimizer = torch.optim.Adam([
+        {'params': model.hyperparameters()},
+        {'params': likelihood.parameters()}
+    ], lr=lr_hyper)
+
+    mll = gpytorch.mlls.VariationalELBO(likelihood, model, num_data=train_y.size(0))
+
+
+    best_loss = float('inf')
+    counter = 0
+    best_state = model.state_dict()
+    data_loader = DataLoader(
+        TensorDataset(train_x, train_y),
+        batch_size=batch_size,
+        shuffle=True
+    )
+    minibatch_iter = itertools.cycle(data_loader)
+
+    with tqdm.tqdm(total=num_iterations, desc="Training") as pbar:
+        for step in range(num_iterations):
+
+            x_batch, y_batch = next(minibatch_iter)
+            x_batch, y_batch = x_batch.to(device), y_batch.to(device)
+
+            variational_ngd_optimizer.zero_grad()
+            output = model(x_batch)
+            loss = -mll(output, y_batch)
+            loss.backward()
+            variational_ngd_optimizer.step()
+
+            hyperparameter_optimizer.zero_grad()
+            output = model(x_batch)
+            loss = -mll(output, y_batch)
+            loss.backward()
+            hyperparameter_optimizer.step()
+
+            if (step + 1) % eval_every == 0 or step == num_iterations - 1:
+                current_loss = evaluate_full_dataset_loss(
+                    model, likelihood, mll,
+                    train_x, train_y,
+                    batch_size=eval_batch_size,
+                    device=device
+                )
+                
+                pbar.set_postfix(full_loss=current_loss)
+                
+                if current_loss < best_loss:
+                    best_loss = current_loss
+                    best_state = model.state_dict()
+                    counter = 0
+                else:
+                    counter += 1
+                    if counter >= patience:
+                        model.load_state_dict(best_state)
+                        pbar.update(num_iterations - step - 1)
+                        break
+
+            pbar.update(1)
+
+    return model, likelihood
 
 
 #############################################################################
@@ -689,3 +798,138 @@ def train_full_DGP_3(full_train_x, full_train_y, num_hidden_dgp_dims = [4,4], in
 
     return model
 
+
+
+#############################################################################
+##
+#############################################################################
+
+def evaluate_full_dataset_loss_dgp(model, x_data, y_data, mll, device='cuda', batch_size=1024):
+
+    model.eval()
+    total_loss = 0.0
+    dataset = TensorDataset(x_data, y_data)
+    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+    
+    with torch.no_grad():
+        for x_batch, y_batch in data_loader:
+            x_batch, y_batch = x_batch.to(device), y_batch.to(device)
+            output = model(x_batch)
+            loss = -mll(output, y_batch)
+            total_loss += loss.item() * x_batch.size(0)
+
+    avg_loss = total_loss / len(dataset)
+    model.train()
+    return avg_loss
+
+
+def train_DGP_2_minibatch(
+    full_train_x, 
+    full_train_y, 
+    num_hidden_dgp_dims=4, 
+    inducing_num=500, 
+    num_iterations=2000, 
+    patience=50, 
+    device='cuda',
+    batch_size=32,
+    eval_every=100,
+    eval_batch_size=1024,
+    lr=0.1
+):
+    """
+    训练Deep GP (2层) 的完整流程，支持小批量训练、早停、全数据集评估和学习率调度。
+    
+    参数说明：
+    - full_train_x, full_train_y: 训练数据
+    - num_hidden_dgp_dims: Deep GP中隐藏层维度
+    - inducing_num: 每层诱导点数量
+    - num_iterations: 总迭代次数上限
+    - patience: 早停耐心值 (评估损失连续多少次不下降就停止)
+    - device: 'cpu' 或 'cuda'
+    - batch_size: 小批量训练时的批量大小
+    - eval_every: 每隔多少次迭代进行一次全数据评估
+    - eval_batch_size: 进行全数据评估时的批量大小
+    - lr: 初始学习率
+    """
+
+    full_train_x = full_train_x.to(device)
+    full_train_y = full_train_y.to(device)
+
+
+    model = GP_models.DeepGP_2(
+        full_train_x.shape, 
+        full_train_y, 
+        num_hidden_dgp_dims, 
+        inducing_num
+    ).to(device)
+
+    model.train()
+
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    mll = gpytorch.mlls.DeepApproximateMLL(
+        gpytorch.mlls.VariationalELBO(
+            model.likelihood,
+            model,
+            num_data=full_train_y.size(0)
+        )
+    )
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, 
+        mode='min', 
+        factor=0.5, 
+        patience=25
+    )
+
+
+    best_loss = float('inf')
+    best_state = model.state_dict()
+    counter = 0
+
+
+    data_loader = DataLoader(
+        TensorDataset(full_train_x, full_train_y),
+        batch_size=batch_size,
+        shuffle=True
+    )
+    minibatch_iter = itertools.cycle(data_loader)
+
+
+    with tqdm.tqdm(total=num_iterations, desc="Training DGP_2") as pbar:
+        for step in range(num_iterations):
+            x_batch, y_batch = next(minibatch_iter)
+            x_batch, y_batch = x_batch.to(device), y_batch.to(device)
+
+            optimizer.zero_grad()
+            output = model(x_batch)
+            loss = -mll(output, y_batch)
+            loss.backward()
+            optimizer.step()
+
+            if (step + 1) % eval_every == 0 or (step == num_iterations - 1):
+                current_loss = evaluate_full_dataset_loss_dgp(
+                    model=model,
+                    x_data=full_train_x,
+                    y_data=full_train_y,
+                    mll=mll,
+                    device=device,
+                    batch_size=eval_batch_size
+                )
+                pbar.set_postfix(full_loss=current_loss)
+                
+                scheduler.step(current_loss)
+
+                if current_loss < best_loss:
+                    best_loss = current_loss
+                    best_state = model.state_dict()
+                    counter = 0
+                else:
+                    counter += 1
+                    if counter >= patience:
+                        model.load_state_dict(best_state)
+                        pbar.update(num_iterations - step - 1)
+                        break
+
+            pbar.update(1)
+
+    return model
