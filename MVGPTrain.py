@@ -60,6 +60,70 @@ test_y = torch.tensor(Y_test_std, dtype=torch.float32)
 
 Device = 'cuda'
 
-MVGP_models, MVGP_likelihoods = Training.train_MultitaskVGP_minibatch(train_x, train_y_21, covar_type='RQ', num_latents=20, num_inducing=500, 
-                                                                      lr_hyper=0.01, lr_variational=0.1, num_iterations=5000, patience=10, 
-                                                                      device=Device, batch_size=500, eval_every=100, eval_batch_size=1024)
+num_latents_candidates = [10,20,25]
+num_inducing_candidates = [300, 400, 800]
+covar_type_candidates = ['RBF', 'RQ', 'Matern5/2']
+
+best_mse = float('inf')
+best_params = None
+best_model = None
+best_likelihood = None
+
+for num_latents in num_latents_candidates:
+    for num_inducing in num_inducing_candidates:
+        for covar_type in covar_type_candidates:
+            MVGP_models, MVGP_likelihoods = Training.train_MultitaskVGP_minibatch(
+                train_x=train_x.to(Device),
+                train_y=train_y_21.to(Device),
+                covar_type=covar_type,
+                num_latents=num_latents,
+                num_inducing=num_inducing,
+                lr_hyper=0.01,
+                lr_variational=0.1,
+                num_iterations=10000,
+                patience=10,
+                device=Device,
+                batch_size=512,
+                eval_every=100,
+                eval_batch_size=1024
+            )
+            
+            full_test_preds_MVGP = Prediction.preds_for_one_model(
+                MVGP_models,
+                MVGP_likelihoods,
+                test_x.to(Device)
+            ).cpu().detach().numpy()
+            
+            mse = np.mean((full_test_preds_MVGP.reshape(-1, 21) - test_y_21.numpy()) ** 2)
+            print(f"Done: covar_type={covar_type}, num_latents={num_latents}, "
+                  f"num_inducing={num_inducing}, MSE={mse:.4f}")
+            
+            if mse < best_mse:
+                best_mse = mse
+                best_params = {
+                    'covar_type': covar_type,
+                    'num_latents': num_latents,
+                    'num_inducing': num_inducing
+                }
+                best_model = MVGP_models  # 保留当下最好的模型
+                best_likelihood = MVGP_likelihoods
+
+print("=====================================")
+print(f"best paramaters: {best_params}")
+print(f"best MSE: {best_mse:.4f}")
+
+# ========== 训练结束后保存最优模型 ==========
+checkpoint = {
+    'model_state_dict': best_model.state_dict(),
+    'likelihood_state_dict': best_likelihood.state_dict(),
+    'model_params': {
+        'num_latents': best_params['num_latents'],
+        'num_inducing': best_params['num_inducing'],
+        'covar_type': best_params['covar_type'],
+        'input_dim': train_x.size(1),
+        'num_tasks': train_y_21.size(1)
+    }
+}
+
+torch.save(checkpoint, 'multitask_gp_checkpoint_21.pth')
+print("save 'multitask_gp_checkpoint_21.pth'。")
