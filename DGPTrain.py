@@ -60,13 +60,6 @@ Device = 'cuda'
 num_hidden_dgp_dims_candidates = [10, 20]
 inducing_num_candidates = [100, 300, 500]
 
-num_iterations = 5000
-patience = 50
-batch_size = 512
-eval_every = 100
-eval_batch_size = 1024
-lr = 0.1
-
 # ============================== #
 
 best_mse = float('inf')
@@ -76,37 +69,28 @@ best_dgp_likelihood = None
 
 # ============================== #
 
-for hidden_dims in num_hidden_dgp_dims_candidates:
-    for inducing_num in inducing_num_candidates:
-        
+# for hidden_dims in num_hidden_dgp_dims_candidates:
 
-        dgp_model= Training.train_DGP_2_minibatch(
-            train_x=train_x.to(Device),
-            train_y=train_y_21.to(Device),
-            num_hidden_dgp_dims=hidden_dims,
-            inducing_num=inducing_num,
-            num_iterations=num_iterations,
-            patience=patience,
-            device=Device,
-            batch_size=batch_size,
-            eval_every=eval_every,
-            eval_batch_size=eval_batch_size,
-            lr=lr
-        )
-        
+hidden_dims = [10, 10, 10]
 
-        mse = evaluate_full_dataset_loss_dgp(dgp_model, test_x.to(Device), test_y_21.to(Device), torch.nn.MSELoss(), device='cuda', batch_size=20)
-        
-        print(f"HiddenDims={hidden_dims}, InducingNum={inducing_num}, MSE={mse:.4f}")
-        
+for inducing_num in inducing_num_candidates:
+    
+    dgp_model= Training.train_DGP_minibatch(train_x, train_y_21, GP_models.DeepGP_4, num_hidden_dgp_dims=hidden_dims, inducing_num=inducing_num, num_iterations=10000, patience=50, 
+                                                device='cuda',batch_size=512,eval_every=100,eval_batch_size=1024,lr=0.1)
+    
 
-        if mse < best_mse:
-            best_mse = mse
-            best_params = {
-                'num_hidden_dgp_dims': hidden_dims,
-                'inducing_num': inducing_num
-            }
-            best_dgp_model = dgp_model
+    mse = evaluate_full_dataset_loss_dgp(dgp_model, test_x.to(Device), test_y_21.to(Device), torch.nn.MSELoss(), device='cuda', batch_size=20)
+    
+    print(f"HiddenDims={hidden_dims}, InducingNum={inducing_num}, MSE={mse:.4f}")
+    
+
+    if mse < best_mse:
+        best_mse = mse
+        best_params = {
+            'num_hidden_dgp_dims': hidden_dims,
+            'inducing_num': inducing_num
+        }
+        best_dgp_model = dgp_model
 
 
 # ============================== #
@@ -128,6 +112,6 @@ checkpoint = {
 }
 
 
-save_path = 'best_dgp_checkpoint_21.pth'
+save_path = 'best_dgp_4_checkpoint_21.pth'
 torch.save(checkpoint, save_path)
 print(f"save {save_path}")

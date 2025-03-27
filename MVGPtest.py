@@ -91,9 +91,9 @@ if __name__ == '__main__':
     best_mse = float('inf')
     best_params = None
 
-    num_latents_list = [12, 14, 16, 18]
-    num_inducing_list = [100, 150, 175, 200, 300, 400]
-    covar_type_list = ['Matern5/2', 'RBF', 'RQ']
+    num_latents_list = [16, 20, 24]
+    num_inducing_list = [200, 400, 800]
+    covar_type_list = ['RBF', 'RQ']
 
     for num_latents in num_latents_list:
         for num_inducing in num_inducing_list:

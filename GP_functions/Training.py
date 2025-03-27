@@ -823,9 +823,10 @@ def evaluate_full_dataset_loss_dgp(model, x_data, y_data, mll, device='cuda', ba
     return avg_loss
 
 
-def train_DGP_2_minibatch(
+def train_DGP_minibatch(
     full_train_x, 
     full_train_y, 
+    DGP_model,
     num_hidden_dgp_dims=4, 
     inducing_num=500, 
     num_iterations=2000, 
@@ -856,7 +857,7 @@ def train_DGP_2_minibatch(
     full_train_y = full_train_y.to(device)
 
 
-    model = GP_models.DeepGP_2(
+    model = DGP_model(
         full_train_x.shape, 
         full_train_y, 
         num_hidden_dgp_dims, 
