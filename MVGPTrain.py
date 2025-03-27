@@ -60,9 +60,9 @@ test_y = torch.tensor(Y_test_std, dtype=torch.float32)
 
 Device = 'cuda'
 
-num_latents_candidates = [10,20,25]
-num_inducing_candidates = [300, 400, 800]
-covar_type_candidates = ['RBF', 'RQ', 'Matern5/2']
+num_latents_candidates = [16,20,24,32]
+num_inducing_candidates = [200, 400, 500]
+covar_type_candidates = ['RBF', 'RQ']
 
 best_mse = float('inf')
 best_params = None
