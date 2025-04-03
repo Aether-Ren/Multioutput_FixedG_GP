@@ -571,11 +571,10 @@ class DeepGP_2(gpytorch.models.deep_gps.DeepGP):
 
 
 class DeepGP_2(gpytorch.models.deep_gps.DeepGP):
-    def __init__(self, train_x_shape, train_y, num_hidden_dgp_dims=4, inducing_num=500,
+    def __init__(self, train_x_shape, train_y, num_hidden_dgp_dims=10, inducing_num=500,
                  kernel_hidden="RBF", kernel_last="RBF"):
         num_tasks = train_y.size(-1)
         
-        # 第一层：隐藏层
         hidden_layer_1 = DGPHiddenLayer(
             input_dims=train_x_shape[-1],
             output_dims=num_hidden_dgp_dims,
@@ -584,7 +583,6 @@ class DeepGP_2(gpytorch.models.deep_gps.DeepGP):
             kernel_type=kernel_hidden
         )
         
-        # 第二层：输出层
         last_layer = DGPHiddenLayer(
             input_dims=hidden_layer_1.output_dims,
             output_dims=num_tasks,
