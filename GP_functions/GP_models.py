@@ -447,39 +447,124 @@ class MultitaskVariationalGP(gpytorch.models.ApproximateGP):
 ## Set up the model structure (DeepGP)
 #############################################################################
 
+# class DGPHiddenLayer(gpytorch.models.deep_gps.DeepGPLayer):
+#     def __init__(self, input_dims, output_dims, num_inducing = 500, linear_mean=True):
+#         # inducing_points = torch.randn(output_dims, num_inducing, input_dims)
+#         inducing_points = torch.rand(output_dims, num_inducing, input_dims) * (5 - 0.1) + 0.1
+
+#         batch_shape = torch.Size([output_dims])
+
+#         variational_distribution = gpytorch.variational.CholeskyVariationalDistribution(
+#             num_inducing_points=num_inducing,
+#             batch_shape=batch_shape
+#         )
+#         variational_strategy = gpytorch.variational.VariationalStrategy(
+#             self,
+#             inducing_points,
+#             variational_distribution,
+#             learn_inducing_locations=True
+#         )
+
+#         super().__init__(variational_strategy, input_dims, output_dims)
+#         # self.mean_module = gpytorch.means.ConstantMean() if linear_mean else gpytorch.means.LinearMean(input_dims)
+#         self.mean_module = gpytorch.means.ZeroMean() if linear_mean else gpytorch.means.LinearMean(input_dims)
+#         self.covar_module = gpytorch.kernels.ScaleKernel(
+#             gpytorch.kernels.RBFKernel(batch_shape=batch_shape, ard_num_dims=input_dims),
+#             batch_shape=batch_shape, ard_num_dims=None
+#         )
+
+#     def forward(self, x):
+#         mean_x = self.mean_module(x)
+#         covar_x = self.covar_module(x)
+#         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
+    
+
+
+
 class DGPHiddenLayer(gpytorch.models.deep_gps.DeepGPLayer):
-    def __init__(self, input_dims, output_dims, num_inducing = 500, linear_mean=True):
-        # inducing_points = torch.randn(output_dims, num_inducing, input_dims)
-        inducing_points = torch.rand(output_dims, num_inducing, input_dims) * (5 - 0.1) + 0.1
-
-        batch_shape = torch.Size([output_dims])
-
-        variational_distribution = gpytorch.variational.CholeskyVariationalDistribution(
+    def __init__(self, input_dims, output_dims, num_latents, num_inducing=500, linear_mean=True,
+                 covar_type='Matern3/2', kernel_args=None):
+        """
+        参数说明：
+          input_dims: 输入特征维度
+          output_dims: 对应任务数或者隐藏层输出维度
+          num_latents: latent 过程数量
+          num_inducing: 诱导点数量
+          linear_mean: 若 True 则使用零均值（类似多任务 GP 的设置），否则使用线性均值
+          covar_type: 核函数类型，可选 'RBF', 'Matern5/2', 'Matern3/2', 'RQ', 'PiecewisePolynomial'
+          kernel_args: 传递给核函数的其他参数（字典形式）
+        """
+        if kernel_args is None:
+            kernel_args = {}
+            
+        # 构造诱导点：形状为 (num_latents, num_inducing, input_dims)
+        inducing_points = torch.rand(num_latents, num_inducing, input_dims) * (5 - 0.1) + 0.1
+        
+        # 使用多任务 GP 中常用的 NaturalVariationalDistribution
+        variational_distribution = gpytorch.variational.NaturalVariationalDistribution(
             num_inducing_points=num_inducing,
-            batch_shape=batch_shape
+            batch_shape=torch.Size([num_latents])
         )
-        variational_strategy = gpytorch.variational.VariationalStrategy(
+        
+        # 构造基础 VariationalStrategy
+        base_variational_strategy = gpytorch.variational.VariationalStrategy(
             self,
             inducing_points,
             variational_distribution,
             learn_inducing_locations=True
         )
-
-        super().__init__(variational_strategy, input_dims, output_dims)
-        # self.mean_module = gpytorch.means.ConstantMean() if linear_mean else gpytorch.means.LinearMean(input_dims)
-        self.mean_module = gpytorch.means.ZeroMean() if linear_mean else gpytorch.means.LinearMean(input_dims)
-        self.covar_module = gpytorch.kernels.ScaleKernel(
-            gpytorch.kernels.RBFKernel(batch_shape=batch_shape, ard_num_dims=input_dims),
-            batch_shape=batch_shape, ard_num_dims=None
+        # 将基础策略包装为 LMCVariationalStrategy，使其支持多个 latent 过程混合成多任务输出
+        lmc_variational_strategy = gpytorch.variational.LMCVariationalStrategy(
+            base_variational_strategy,
+            num_tasks=output_dims,
+            num_latents=num_latents,
+            latent_dim=-1
         )
-
+        
+        super().__init__(lmc_variational_strategy, input_dims, output_dims)
+        
+        # 均值函数：对于多任务 GP 一般采用零均值（linear_mean 为 True），或使用线性均值
+        if linear_mean:
+            self.mean_module = gpytorch.means.ZeroMean(batch_shape=torch.Size([num_latents]))
+        else:
+            self.mean_module = gpytorch.means.LinearMean(input_dims, batch_shape=torch.Size([num_latents]))
+        
+        # 根据 covar_type 选择对应的核函数
+        if covar_type == 'Matern5/2':
+            base_kernel = gpytorch.kernels.MaternKernel(nu=2.5,
+                                                        batch_shape=torch.Size([num_latents]),
+                                                        ard_num_dims=input_dims,
+                                                        **kernel_args)
+        elif covar_type == 'RBF':
+            base_kernel = gpytorch.kernels.RBFKernel(batch_shape=torch.Size([num_latents]),
+                                                     ard_num_dims=input_dims,
+                                                     **kernel_args)
+        elif covar_type == 'Matern3/2':
+            base_kernel = gpytorch.kernels.MaternKernel(nu=1.5,
+                                                        batch_shape=torch.Size([num_latents]),
+                                                        ard_num_dims=input_dims,
+                                                        **kernel_args)
+        elif covar_type == 'RQ':
+            base_kernel = gpytorch.kernels.RQKernel(batch_shape=torch.Size([num_latents]),
+                                                    ard_num_dims=input_dims,
+                                                    **kernel_args)
+        elif covar_type == 'PiecewisePolynomial':
+            base_kernel = gpytorch.kernels.PiecewisePolynomialKernel(q=2,
+                                                                     batch_shape=torch.Size([num_latents]),
+                                                                     ard_num_dims=input_dims,
+                                                                     **kernel_args)
+        else:
+            raise ValueError("请在以下选项中选择核函数: RBF, Matern5/2, Matern3/2, RQ, PiecewisePolynomial")
+        
+        self.covar_module = gpytorch.kernels.ScaleKernel(base_kernel,
+                                                         batch_shape=torch.Size([num_latents]))
+    
     def forward(self, x):
         mean_x = self.mean_module(x)
         covar_x = self.covar_module(x)
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
-    
 
-    
+
 
 
 class DeepGP_2(gpytorch.models.deep_gps.DeepGP):
