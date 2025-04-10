@@ -2,8 +2,6 @@
 Multi-output GP in fixed G
 
 
-LocalGP running in 32
-
 ## Model
 
 - L.GP (21)
@@ -14,5 +12,9 @@ LocalGP running in 32
 - NN (21) (52)
 
 
-### L.MGP in 21
+### L.MGP 21
 k = 500
+
+
+## Running
+MGP_21 in 11
