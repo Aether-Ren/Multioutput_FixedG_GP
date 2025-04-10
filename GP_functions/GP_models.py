@@ -481,6 +481,7 @@ class MultitaskVariationalGP(gpytorch.models.ApproximateGP):
 
 
 
+<<<<<<< HEAD
 class DGPHiddenLayer(gpytorch.models.deep_gps.DeepGPLayer):
     def __init__(self, input_dims, output_dims, num_latents, num_inducing=500, linear_mean=True,
                  covar_type='Matern3/2', kernel_args=None):
@@ -502,6 +503,18 @@ class DGPHiddenLayer(gpytorch.models.deep_gps.DeepGPLayer):
         
         # 使用多任务 GP 中常用的 NaturalVariationalDistribution
         variational_distribution = gpytorch.variational.NaturalVariationalDistribution(
+=======
+
+
+class DGPHiddenLayer(gpytorch.models.deep_gps.DeepGPLayer):
+    def __init__(self, input_dims, output_dims, num_inducing=500, linear_mean=True, covar_type = "RBF"):
+
+        inducing_points = torch.rand(output_dims, num_inducing, input_dims) * (5 - 0.1) + 0.1
+
+        batch_shape = torch.Size([output_dims])
+        
+        variational_distribution = gpytorch.variational.CholeskyVariationalDistribution(
+>>>>>>> 01e6aecde4cc9e2c3c839e2b7a59febe438d9042
             num_inducing_points=num_inducing,
             batch_shape=torch.Size([num_latents])
         )
@@ -513,6 +526,7 @@ class DGPHiddenLayer(gpytorch.models.deep_gps.DeepGPLayer):
             variational_distribution,
             learn_inducing_locations=True
         )
+<<<<<<< HEAD
         # 将基础策略包装为 LMCVariationalStrategy，使其支持多个 latent 过程混合成多任务输出
         lmc_variational_strategy = gpytorch.variational.LMCVariationalStrategy(
             base_variational_strategy,
@@ -558,6 +572,27 @@ class DGPHiddenLayer(gpytorch.models.deep_gps.DeepGPLayer):
         
         self.covar_module = gpytorch.kernels.ScaleKernel(base_kernel,
                                                          batch_shape=torch.Size([num_latents]))
+=======
+        
+        super().__init__(variational_strategy, input_dims, output_dims)
+        
+        self.mean_module = gpytorch.means.ZeroMean() if linear_mean else gpytorch.means.LinearMean(input_dims)
+        
+        if covar_type == 'RBF':
+            base_kernel = gpytorch.kernels.RBFKernel(batch_shape=batch_shape, ard_num_dims=input_dims)
+        elif covar_type == 'Matern5/2':
+            base_kernel = gpytorch.kernels.MaternKernel(nu=2.5, batch_shape=batch_shape, ard_num_dims=input_dims)
+        elif covar_type == 'Matern3/2':
+            base_kernel = gpytorch.kernels.MaternKernel(nu=1.5, batch_shape=batch_shape, ard_num_dims=input_dims)
+        else:
+            raise ValueError("Unsupported kernel type: {}".format(covar_type))
+            
+        self.covar_module = gpytorch.kernels.ScaleKernel(
+            base_kernel,
+            batch_shape=batch_shape,
+            ard_num_dims=None
+        )
+>>>>>>> 01e6aecde4cc9e2c3c839e2b7a59febe438d9042
     
     def forward(self, x):
         mean_x = self.mean_module(x)
@@ -565,6 +600,11 @@ class DGPHiddenLayer(gpytorch.models.deep_gps.DeepGPLayer):
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
 
 
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> 01e6aecde4cc9e2c3c839e2b7a59febe438d9042
 
 
 class DeepGP_2(gpytorch.models.deep_gps.DeepGP):
@@ -604,6 +644,47 @@ class DeepGP_2(gpytorch.models.deep_gps.DeepGP):
         preds = self.likelihood(self(test_x)).to_data_independent_dist()
 
         return preds.mean.mean(0).squeeze(), preds.variance.mean(0).squeeze()
+
+
+
+class DeepGP_2(gpytorch.models.deep_gps.DeepGP):
+    def __init__(self, train_x_shape, train_y, num_hidden_dgp_dims=10, inducing_num=500,
+                 kernel_hidden="RBF", kernel_last="RBF"):
+        num_tasks = train_y.size(-1)
+        
+        hidden_layer_1 = DGPHiddenLayer(
+            input_dims=train_x_shape[-1],
+            output_dims=num_hidden_dgp_dims,
+            num_inducing=inducing_num, 
+            linear_mean=True,
+            kernel_type=kernel_hidden
+        )
+        
+        last_layer = DGPHiddenLayer(
+            input_dims=hidden_layer_1.output_dims,
+            output_dims=num_tasks,
+            num_inducing=inducing_num, 
+            linear_mean=False,
+            kernel_type=kernel_last
+        )
+        
+        super().__init__()
+        self.hidden_layer_1 = hidden_layer_1
+        self.last_layer = last_layer
+        
+
+        self.likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(num_tasks=num_tasks)
+    
+    def forward(self, inputs):
+        hidden_rep = self.hidden_layer_1(inputs)
+        output = self.last_layer(hidden_rep)
+        return output
+    
+    def predict(self, test_x):
+        preds = self.likelihood(self(test_x)).to_data_independent_dist()
+        return preds.mean.mean(0).squeeze(), preds.variance.mean(0).squeeze()
+
+
 
 
 
