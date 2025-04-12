@@ -73,7 +73,7 @@ MVGP_likelihoods.eval()
 for row_idx in range(test_y_21.shape[0]):
     input_point = test_y_21[row_idx, :]
 
-    local_train_x, local_train_y = Tools.find_k_nearest_neighbors_CPU(input_point, train_x, train_y_21, k=500)
+    local_train_x, local_train_y = Tools.find_k_nearest_neighbors_CPU(input_point, train_x, train_y_21, k=100)
 
     preds_tmp = Prediction.preds_for_one_model(
         MVGP_models, MVGP_likelihoods, test_x[row_idx,:].unsqueeze(0).to(Device)
@@ -84,22 +84,21 @@ for row_idx in range(test_y_21.shape[0]):
 
     estimated_params_tmp, _ = Estimation.multi_start_estimation(
         MVGP_models, MVGP_likelihoods, row_idx, test_y_21, bounds,
-        Estimation.estimate_params_for_one_model_Adam, num_starts=15, num_iterations=2000, lr=0.01,
-        patience=50, attraction_threshold=0.1, repulsion_strength=0.1, device=Device
+        Estimation.estimate_params_for_one_model_Adam, num_starts=4, num_iterations=1000, lr=0.01,
+        patience=10, attraction_threshold=0.1, repulsion_strength=0.1, device=Device
     )
 
+    with open(output_file, 'a') as f:
+        # f.write(f"{row_idx + 1},\"{list(preds_tmp)}\",\"{list(estimated_params_tmp.detach().numpy())}\"\n")
+        f.write(f"{row_idx + 1},\"{list(preds_tmp)}\",\"{list(estimated_params_tmp)}\"\n")
 
     mcmc_result_Uniform = Estimation.run_mcmc_Uniform(
         Prediction.preds_distribution, MVGP_models, MVGP_likelihoods, 
-        row_idx, test_y, bounds, 
-        num_sampling=1200, warmup_step=300, num_chains=2, device=Device
+        row_idx, test_y_21, bounds, 
+        num_sampling=1200, warmup_step=300, num_chains=1, device=Device
     )
     posterior_samples_Uniform = mcmc_result_Uniform.get_samples()
 
-
-
-    with open(output_file, 'a') as f:
-        f.write(f"{row_idx + 1},\"{list(preds_tmp)}\",\"{list(estimated_params_tmp.detach().numpy())}\"\n")
 
     mcmc_file = os.path.join(mcmc_dir, f'result_{row_idx + 1}.pkl')
     with open(mcmc_file, 'wb') as f:
