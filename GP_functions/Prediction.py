@@ -23,6 +23,13 @@ def preds_distribution(model, likelihood, xxx):
     return preds
 
 
+def preds_distribution_fast_pred_var(model, likelihood, xxx):
+    model.eval()
+    likelihood.eval()
+    with gpytorch.settings.fast_pred_var():
+        preds = likelihood(model(xxx))
+    return preds
+
 def preds_for_one_model(model, likelihood, xxx):
     # Prediction of a column of the local data
     model.eval()

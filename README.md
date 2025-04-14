@@ -17,6 +17,6 @@ k = 500
 
 
 ## Running
-MGP_21 in 32
+MGP_21 in 11
 DKMGP 12
 MVGP 34
