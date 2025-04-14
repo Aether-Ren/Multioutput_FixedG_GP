@@ -606,3 +606,45 @@ def run_mcmc_Normal(Pre_function, Models, Likelihoods, row_idx, test_y, local_tr
 
 
 #     return mcmc
+
+
+
+
+def run_mcmc_Uniform_initial_params(
+    Pre_function, Models, Likelihoods, row_idx, test_y, bounds,
+    num_sampling=2000, warmup_step=1000, num_chains=1, device='cpu',
+    initial_params=None
+):
+    test_y = test_y.to(dtype=torch.float32, device=device)
+
+    bounds = [
+        (
+            torch.tensor(b[0], dtype=torch.float32, device=device),
+            torch.tensor(b[1], dtype=torch.float32, device=device)
+        ) for b in bounds
+    ]
+
+    def model():
+        params = []
+        for i, (min_val, max_val) in enumerate(bounds):
+            param_i = pyro.sample(f'param_{i}', dist.Uniform(min_val, max_val))
+            params.append(param_i)
+
+        theta = torch.stack(params)
+        gp_pred = Pre_function(Models, Likelihoods, theta.unsqueeze(0))
+        y_obs = test_y[row_idx, :]
+        pyro.sample('obs', gp_pred, obs=y_obs)
+
+    nuts_kernel = NUTS(model)
+
+    initial_params_dict = {
+        f'param_{i}': torch.tensor(p, dtype=torch.float32, device=device)
+        for i, p in enumerate(initial_params)
+    }
+
+    mcmc = MCMC(nuts_kernel, num_samples=num_sampling, warmup_steps=warmup_step, num_chains=num_chains, initial_params=initial_params_dict)
+    mcmc.run()
+
+
+
+    return mcmc

@@ -67,7 +67,7 @@ for row_idx in range(test_y_21.shape[0]):
         MultitaskGP_models, MultitaskGP_likelihoods, test_x[row_idx,:].unsqueeze(0).to(Device)
         ).cpu().detach().numpy()
 
-    local_train_x, local_train_y = Tools.find_k_nearest_neighbors_CPU(input_point, train_x, train_y_21, k=100)
+    # local_train_x, local_train_y = Tools.find_k_nearest_neighbors_CPU(input_point, train_x, train_y_21, k=100)
     bounds = bound.get_bounds(local_train_x)
 
     estimated_params_tmp, _ = Estimation.multi_start_estimation(
