@@ -875,12 +875,12 @@ def train_DGP_minibatch(
             num_data=full_train_y.size(0)
         )
     )
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, 
-        mode='min', 
-        factor=0.5, 
-        patience=25
-    )
+    # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+    #     optimizer, 
+    #     mode='min', 
+    #     factor=0.5, 
+    #     patience=25
+    # )
 
 
     best_loss = float('inf')
@@ -918,7 +918,7 @@ def train_DGP_minibatch(
                 )
                 pbar.set_postfix(full_loss=current_loss)
                 
-                scheduler.step(current_loss)
+                # scheduler.step(current_loss)
 
                 if current_loss < best_loss:
                     best_loss = current_loss
