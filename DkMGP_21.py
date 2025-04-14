@@ -79,10 +79,10 @@ for row_idx in range(test_y_21.shape[0]):
     with open(output_file, 'a') as f:
         f.write(f"{row_idx + 1},\"{list(preds_tmp)}\",\"{list(estimated_params_tmp)}\"\n")
 
-    mcmc_result_Uniform = Estimation.run_mcmc_Uniform(
-        Prediction.preds_distribution, MultitaskGP_models, MultitaskGP_likelihoods, 
+    mcmc_result_Uniform = Estimation.run_mcmc_Uniform_initial_params(
+        Prediction.preds_distribution_fast_pred_var, MultitaskGP_models, MultitaskGP_likelihoods, 
         row_idx, test_y_21, bounds, 
-        num_sampling=1200, warmup_step=300, num_chains=1, device=Device
+        num_sampling=1200, warmup_step=300, num_chains=1, device=Device, initial_params=estimated_params_tmp
     )
     posterior_samples_Uniform = mcmc_result_Uniform.get_samples()
 

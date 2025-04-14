@@ -385,6 +385,8 @@ class MultitaskVariationalGP(gpytorch.models.ApproximateGP):
         # inducing_points = torch.rand(num_latents, num_inducing, train_x.shape[1]) * (5 - 0.1) + 0.1
         # inducing_points = Tools.select_inducing_points_with_pca(train_x, train_y, num_inducing, num_latents)
         inducing_points = train_x[:num_inducing].unsqueeze(0).expand(num_latents, -1, -1)
+        # inducing_points = train_x[:num_inducing].unsqueeze(0).repeat(num_latents, -1, -1)
+
 
         variational_distribution = gpytorch.variational.NaturalVariationalDistribution(
             inducing_points.size(-2), batch_shape=torch.Size([num_latents])
@@ -447,122 +449,122 @@ class MultitaskVariationalGP(gpytorch.models.ApproximateGP):
 ## Set up the model structure (DeepGP)
 #############################################################################
 
-# class DGPHiddenLayer(gpytorch.models.deep_gps.DeepGPLayer):
-#     def __init__(self, input_dims, output_dims, num_inducing = 500, linear_mean=True):
-#         # inducing_points = torch.randn(output_dims, num_inducing, input_dims)
-#         inducing_points = torch.rand(output_dims, num_inducing, input_dims) * (5 - 0.1) + 0.1
-
-#         batch_shape = torch.Size([output_dims])
-
-#         variational_distribution = gpytorch.variational.CholeskyVariationalDistribution(
-#             num_inducing_points=num_inducing,
-#             batch_shape=batch_shape
-#         )
-#         variational_strategy = gpytorch.variational.VariationalStrategy(
-#             self,
-#             inducing_points,
-#             variational_distribution,
-#             learn_inducing_locations=True
-#         )
-
-#         super().__init__(variational_strategy, input_dims, output_dims)
-#         # self.mean_module = gpytorch.means.ConstantMean() if linear_mean else gpytorch.means.LinearMean(input_dims)
-#         self.mean_module = gpytorch.means.ZeroMean() if linear_mean else gpytorch.means.LinearMean(input_dims)
-#         self.covar_module = gpytorch.kernels.ScaleKernel(
-#             gpytorch.kernels.RBFKernel(batch_shape=batch_shape, ard_num_dims=input_dims),
-#             batch_shape=batch_shape, ard_num_dims=None
-#         )
-
-#     def forward(self, x):
-#         mean_x = self.mean_module(x)
-#         covar_x = self.covar_module(x)
-#         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
-    
-
-
-
 class DGPHiddenLayer(gpytorch.models.deep_gps.DeepGPLayer):
-    def __init__(self, input_dims, output_dims, num_latents, num_inducing=500, linear_mean=True,
-                 covar_type='Matern3/2', kernel_args=None):
-        """
-        参数说明：
-          input_dims: 输入特征维度
-          output_dims: 对应任务数或者隐藏层输出维度
-          num_latents: latent 过程数量
-          num_inducing: 诱导点数量
-          linear_mean: 若 True 则使用零均值（类似多任务 GP 的设置），否则使用线性均值
-          covar_type: 核函数类型，可选 'RBF', 'Matern5/2', 'Matern3/2', 'RQ', 'PiecewisePolynomial'
-          kernel_args: 传递给核函数的其他参数（字典形式）
-        """
-        if kernel_args is None:
-            kernel_args = {}
-            
-        # 构造诱导点：形状为 (num_latents, num_inducing, input_dims)
-        inducing_points = torch.rand(num_latents, num_inducing, input_dims) * (5 - 0.1) + 0.1
-        
-        # 使用多任务 GP 中常用的 NaturalVariationalDistribution
-        variational_distribution = gpytorch.variational.NaturalVariationalDistribution(
+    def __init__(self, input_dims, output_dims, num_inducing = 500, linear_mean=True):
+        # inducing_points = torch.randn(output_dims, num_inducing, input_dims)
+        inducing_points = torch.rand(output_dims, num_inducing, input_dims) * (5 - 0.1) + 0.1
+
+        batch_shape = torch.Size([output_dims])
+
+        variational_distribution = gpytorch.variational.CholeskyVariationalDistribution(
             num_inducing_points=num_inducing,
-            batch_shape=torch.Size([num_latents])
+            batch_shape=batch_shape
         )
-        
-        # 构造基础 VariationalStrategy
-        base_variational_strategy = gpytorch.variational.VariationalStrategy(
+        variational_strategy = gpytorch.variational.VariationalStrategy(
             self,
             inducing_points,
             variational_distribution,
             learn_inducing_locations=True
         )
-        # 将基础策略包装为 LMCVariationalStrategy，使其支持多个 latent 过程混合成多任务输出
-        lmc_variational_strategy = gpytorch.variational.LMCVariationalStrategy(
-            base_variational_strategy,
-            num_tasks=output_dims,
-            num_latents=num_latents,
-            latent_dim=-1
+
+        super().__init__(variational_strategy, input_dims, output_dims)
+        # self.mean_module = gpytorch.means.ConstantMean() if linear_mean else gpytorch.means.LinearMean(input_dims)
+        self.mean_module = gpytorch.means.ZeroMean() if linear_mean else gpytorch.means.LinearMean(input_dims)
+        self.covar_module = gpytorch.kernels.ScaleKernel(
+            gpytorch.kernels.RBFKernel(batch_shape=batch_shape, ard_num_dims=input_dims),
+            batch_shape=batch_shape, ard_num_dims=None
         )
-        
-        super().__init__(lmc_variational_strategy, input_dims, output_dims)
-        
-        # 均值函数：对于多任务 GP 一般采用零均值（linear_mean 为 True），或使用线性均值
-        if linear_mean:
-            self.mean_module = gpytorch.means.ZeroMean(batch_shape=torch.Size([num_latents]))
-        else:
-            self.mean_module = gpytorch.means.LinearMean(input_dims, batch_shape=torch.Size([num_latents]))
-        
-        # 根据 covar_type 选择对应的核函数
-        if covar_type == 'Matern5/2':
-            base_kernel = gpytorch.kernels.MaternKernel(nu=2.5,
-                                                        batch_shape=torch.Size([num_latents]),
-                                                        ard_num_dims=input_dims,
-                                                        **kernel_args)
-        elif covar_type == 'RBF':
-            base_kernel = gpytorch.kernels.RBFKernel(batch_shape=torch.Size([num_latents]),
-                                                     ard_num_dims=input_dims,
-                                                     **kernel_args)
-        elif covar_type == 'Matern3/2':
-            base_kernel = gpytorch.kernels.MaternKernel(nu=1.5,
-                                                        batch_shape=torch.Size([num_latents]),
-                                                        ard_num_dims=input_dims,
-                                                        **kernel_args)
-        elif covar_type == 'RQ':
-            base_kernel = gpytorch.kernels.RQKernel(batch_shape=torch.Size([num_latents]),
-                                                    ard_num_dims=input_dims,
-                                                    **kernel_args)
-        elif covar_type == 'PiecewisePolynomial':
-            base_kernel = gpytorch.kernels.PiecewisePolynomialKernel(q=2,
-                                                                     batch_shape=torch.Size([num_latents]),
-                                                                     ard_num_dims=input_dims,
-                                                                     **kernel_args)
-        else:
-            raise ValueError("请在以下选项中选择核函数: RBF, Matern5/2, Matern3/2, RQ, PiecewisePolynomial")
-        
-        self.covar_module = gpytorch.kernels.ScaleKernel(base_kernel,
-                                                         batch_shape=torch.Size([num_latents]))
-    
+
     def forward(self, x):
         mean_x = self.mean_module(x)
         covar_x = self.covar_module(x)
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
+    
+
+
+
+# class DGPHiddenLayer(gpytorch.models.deep_gps.DeepGPLayer):
+#     def __init__(self, input_dims, output_dims, num_latents, num_inducing=500, linear_mean=True,
+#                  covar_type='Matern3/2', kernel_args=None):
+#         """
+#         参数说明：
+#           input_dims: 输入特征维度
+#           output_dims: 对应任务数或者隐藏层输出维度
+#           num_latents: latent 过程数量
+#           num_inducing: 诱导点数量
+#           linear_mean: 若 True 则使用零均值（类似多任务 GP 的设置），否则使用线性均值
+#           covar_type: 核函数类型，可选 'RBF', 'Matern5/2', 'Matern3/2', 'RQ', 'PiecewisePolynomial'
+#           kernel_args: 传递给核函数的其他参数（字典形式）
+#         """
+#         if kernel_args is None:
+#             kernel_args = {}
+            
+#         # 构造诱导点：形状为 (num_latents, num_inducing, input_dims)
+#         inducing_points = torch.rand(num_latents, num_inducing, input_dims) * (5 - 0.1) + 0.1
+        
+#         # 使用多任务 GP 中常用的 NaturalVariationalDistribution
+#         variational_distribution = gpytorch.variational.NaturalVariationalDistribution(
+#             num_inducing_points=num_inducing,
+#             batch_shape=torch.Size([num_latents])
+#         )
+        
+#         # 构造基础 VariationalStrategy
+#         base_variational_strategy = gpytorch.variational.VariationalStrategy(
+#             self,
+#             inducing_points,
+#             variational_distribution,
+#             learn_inducing_locations=True
+#         )
+#         # 将基础策略包装为 LMCVariationalStrategy，使其支持多个 latent 过程混合成多任务输出
+#         lmc_variational_strategy = gpytorch.variational.LMCVariationalStrategy(
+#             base_variational_strategy,
+#             num_tasks=output_dims,
+#             num_latents=num_latents,
+#             latent_dim=-1
+#         )
+        
+#         super().__init__(lmc_variational_strategy, input_dims, output_dims)
+        
+#         # 均值函数：对于多任务 GP 一般采用零均值（linear_mean 为 True），或使用线性均值
+#         if linear_mean:
+#             self.mean_module = gpytorch.means.ZeroMean(batch_shape=torch.Size([num_latents]))
+#         else:
+#             self.mean_module = gpytorch.means.LinearMean(input_dims, batch_shape=torch.Size([num_latents]))
+        
+#         # 根据 covar_type 选择对应的核函数
+#         if covar_type == 'Matern5/2':
+#             base_kernel = gpytorch.kernels.MaternKernel(nu=2.5,
+#                                                         batch_shape=torch.Size([num_latents]),
+#                                                         ard_num_dims=input_dims,
+#                                                         **kernel_args)
+#         elif covar_type == 'RBF':
+#             base_kernel = gpytorch.kernels.RBFKernel(batch_shape=torch.Size([num_latents]),
+#                                                      ard_num_dims=input_dims,
+#                                                      **kernel_args)
+#         elif covar_type == 'Matern3/2':
+#             base_kernel = gpytorch.kernels.MaternKernel(nu=1.5,
+#                                                         batch_shape=torch.Size([num_latents]),
+#                                                         ard_num_dims=input_dims,
+#                                                         **kernel_args)
+#         elif covar_type == 'RQ':
+#             base_kernel = gpytorch.kernels.RQKernel(batch_shape=torch.Size([num_latents]),
+#                                                     ard_num_dims=input_dims,
+#                                                     **kernel_args)
+#         elif covar_type == 'PiecewisePolynomial':
+#             base_kernel = gpytorch.kernels.PiecewisePolynomialKernel(q=2,
+#                                                                      batch_shape=torch.Size([num_latents]),
+#                                                                      ard_num_dims=input_dims,
+#                                                                      **kernel_args)
+#         else:
+#             raise ValueError("请在以下选项中选择核函数: RBF, Matern5/2, Matern3/2, RQ, PiecewisePolynomial")
+        
+#         self.covar_module = gpytorch.kernels.ScaleKernel(base_kernel,
+#                                                          batch_shape=torch.Size([num_latents]))
+    
+#     def forward(self, x):
+#         mean_x = self.mean_module(x)
+#         covar_x = self.covar_module(x)
+#         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
 
 
 
@@ -607,42 +609,42 @@ class DeepGP_2(gpytorch.models.deep_gps.DeepGP):
 
 
 
-class DeepGP_2(gpytorch.models.deep_gps.DeepGP):
-    def __init__(self, train_x_shape, train_y, num_hidden_dgp_dims=10, inducing_num=500,
-                 kernel_hidden="RBF", kernel_last="RBF"):
-        num_tasks = train_y.size(-1)
+# class DeepGP_2(gpytorch.models.deep_gps.DeepGP):
+#     def __init__(self, train_x_shape, train_y, num_hidden_dgp_dims=10, inducing_num=500,
+#                  kernel_hidden="RBF", kernel_last="RBF"):
+#         num_tasks = train_y.size(-1)
         
-        hidden_layer_1 = DGPHiddenLayer(
-            input_dims=train_x_shape[-1],
-            output_dims=num_hidden_dgp_dims,
-            num_inducing=inducing_num, 
-            linear_mean=True,
-            kernel_type=kernel_hidden
-        )
+#         hidden_layer_1 = DGPHiddenLayer(
+#             input_dims=train_x_shape[-1],
+#             output_dims=num_hidden_dgp_dims,
+#             num_inducing=inducing_num, 
+#             linear_mean=True,
+#             kernel_type=kernel_hidden
+#         )
         
-        last_layer = DGPHiddenLayer(
-            input_dims=hidden_layer_1.output_dims,
-            output_dims=num_tasks,
-            num_inducing=inducing_num, 
-            linear_mean=False,
-            kernel_type=kernel_last
-        )
+#         last_layer = DGPHiddenLayer(
+#             input_dims=hidden_layer_1.output_dims,
+#             output_dims=num_tasks,
+#             num_inducing=inducing_num, 
+#             linear_mean=False,
+#             kernel_type=kernel_last
+#         )
         
-        super().__init__()
-        self.hidden_layer_1 = hidden_layer_1
-        self.last_layer = last_layer
+#         super().__init__()
+#         self.hidden_layer_1 = hidden_layer_1
+#         self.last_layer = last_layer
         
 
-        self.likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(num_tasks=num_tasks)
+#         self.likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(num_tasks=num_tasks)
     
-    def forward(self, inputs):
-        hidden_rep = self.hidden_layer_1(inputs)
-        output = self.last_layer(hidden_rep)
-        return output
+#     def forward(self, inputs):
+#         hidden_rep = self.hidden_layer_1(inputs)
+#         output = self.last_layer(hidden_rep)
+#         return output
     
-    def predict(self, test_x):
-        preds = self.likelihood(self(test_x)).to_data_independent_dist()
-        return preds.mean.mean(0).squeeze(), preds.variance.mean(0).squeeze()
+#     def predict(self, test_x):
+#         preds = self.likelihood(self(test_x)).to_data_independent_dist()
+#         return preds.mean.mean(0).squeeze(), preds.variance.mean(0).squeeze()
 
 
 
