@@ -391,7 +391,7 @@ def train_MultitaskVGP_minibatch(train_x, train_y, covar_type='Matern3/2', num_l
 
 
 
-def train_one_row_MultitaskGP(local_train_x, local_train_y, n_tasks, covar_type = 'RBF', lr=0.05, num_iterations=5000, patience=10, device='cpu'):
+def train_one_row_MultitaskGP(local_train_x, local_train_y, n_tasks, covar_type = 'RBF', lr=0.05, num_iterations=5000, patience=10, device='cpu', disable_progbar=True):
 
     local_train_x = local_train_x.to(device)
     local_train_y = local_train_y.to(device)
@@ -411,15 +411,16 @@ def train_one_row_MultitaskGP(local_train_x, local_train_y, n_tasks, covar_type 
     
     best_loss = float('inf')
     counter = 0
-    # iterator = tqdm.tqdm(range(num_iterations))
+    iterator = tqdm.tqdm(range(num_iterations), disable=disable_progbar)
 
-    # for i in iterator:
-    for i in range(num_iterations):
+    for i in iterator:
+    # for i in range(num_iterations):
         optimizer.zero_grad()
         output = model(local_train_x)
         loss = -mll(output, local_train_y)
         loss.backward()
-        # iterator.set_postfix(loss=loss.item())
+        if not disable_progbar:
+            iterator.set_postfix(loss=loss.item())
         optimizer.step()
 
         if loss <= best_loss:
