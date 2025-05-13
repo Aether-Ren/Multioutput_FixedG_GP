@@ -34,8 +34,9 @@ def preds_for_one_model(model, likelihood, xxx):
     # Prediction of a column of the local data
     model.eval()
     likelihood.eval()
-    # with torch.no_grad(),gpytorch.settings.fast_pred_var():
-    preds = likelihood(model(xxx)).mean
+    with gpytorch.settings.fast_pred_var():
+        preds = likelihood(model(xxx)).mean
+    # preds = likelihood(model(xxx)).mean
     return preds.view(-1)
 
 def full_preds(models, likelihoods, xxx):
