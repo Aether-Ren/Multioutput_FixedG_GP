@@ -87,6 +87,9 @@ def run_mcmc_Uniform_group(Pre_function, Models, Likelihoods,
                              true_params, groupN,
                              num_sampling=2000, warmup_step=1000,
                              num_chains=1, device='cpu'):
+    if not (1 <= groupN <= 5):
+        raise ValueError("groupN should between 1-5")
+
     test_y = test_y.to(dtype=torch.float32, device=device)
     true_params = torch.as_tensor(true_params, dtype=torch.float32, device=device)
 
@@ -98,14 +101,9 @@ def run_mcmc_Uniform_group(Pre_function, Models, Likelihoods,
         for lo, hi in bounds
     ]
 
-    if not (1 <= groupN <= 5):
-        raise ValueError("groupN between 1-5 ")
-    i0, i1 = 2 * (groupN - 1), 2 * (groupN - 1) + 1
-    sample_idx = (i0, i1)
-
+    sample_idx = list(range(2 * groupN))
 
     def model():
-
         theta = true_params.clone()
 
         for k in sample_idx:
@@ -116,6 +114,7 @@ def run_mcmc_Uniform_group(Pre_function, Models, Likelihoods,
         pred_dist = Pre_function(Models, Likelihoods, theta.unsqueeze(0))
         pyro.sample("obs", pred_dist, obs=test_y[row_idx])
 
+
     nuts_kernel = NUTS(model)
     mcmc = MCMC(
         nuts_kernel,
@@ -124,8 +123,9 @@ def run_mcmc_Uniform_group(Pre_function, Models, Likelihoods,
         num_chains=num_chains,
     )
     mcmc.run()
-
     return mcmc
+
+
 
 
 true_params = test_x[row_idx].numpy()
