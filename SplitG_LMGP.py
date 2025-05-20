@@ -68,7 +68,7 @@ train_y = torch.tensor(Y_train_std, dtype=torch.float32)
 test_y = torch.tensor(Y_test_std, dtype=torch.float32)
 
 
-row_idx = 0
+row_idx = 10
 
 input_point = test_y_21[row_idx,:]
 local_train_x, local_train_y = Tools.find_k_nearest_neighbors_CPU(input_point, train_x, train_y_21, k=500)
