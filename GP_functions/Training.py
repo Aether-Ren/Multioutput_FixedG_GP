@@ -631,45 +631,84 @@ def train_one_row_NNLocalGP_Parallel(train_x, train_y, test_y, row_idx, feature_
 #############################################################################
 
 
-def train_DNN_MSE(NN_model, full_train_x, full_train_y, num_iterations = 50000, device='cuda'):
+def train_DNN_MSE(
+    NN_model,
+    full_train_x,
+    full_train_y,
+    num_iterations= 50000,
+    device= 'cuda',
+    show_progress = True,
+    weight_decay = 0.2,
+    val_x=None,
+    val_y=None,
+    early_stopping = False,
+    patience = 1000,
+    val_check_interval = 100
+):
+
+
 
     full_train_x = full_train_x.to(device)
     full_train_y = full_train_y.to(device)
+    if early_stopping and (val_x is not None and val_y is not None):
+        val_x = val_x.to(device)
+        val_y = val_y.to(device)
+    else:
+        early_stopping = False
 
-    model = NN_model(full_train_x, full_train_y)
-
-    model = model.to(device)
-
+    model = NN_model(full_train_x, full_train_y).to(device)
     model.train()
- 
+    criterion = torch.nn.MSELoss()
+    optimizer = torch.optim.Adam(
+        model.parameters(),
+        lr=0.2,
+        weight_decay=weight_decay  # L2
+    )
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode='min', factor=0.5, patience=100
+    )
 
-    criterion = torch.nn.MSELoss() 
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.2)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor = 0.5, patience = 100)
-    
 
-    # iterator = tqdm.tqdm(range(num_iterations))
+    best_val_loss = float('inf')
+    best_state = None
+    no_improve = 0
 
-
-    # for i in iterator:
-    for i in range(num_iterations):
+    iterator = tqdm.tqdm(range(num_iterations), disable=not show_progress)
+    for i in iterator:
         optimizer.zero_grad()
         output = model(full_train_x)
         loss = criterion(output, full_train_y)
         loss.backward()
-        # iterator.set_postfix(loss=loss.item())
         optimizer.step()
+
         scheduler.step(loss)
 
-        # if loss <= best_loss:
-        #     best_loss = loss
-        #     best_state = model.state_dict()  
-        #     counter = 0
-        # else:
-        #     counter += 1
-        #     if counter >= patience:
-        #         model.load_state_dict(best_state)  
-        #         break
+        if early_stopping and (i + 1) % val_check_interval == 0:
+            model.eval()
+            with torch.no_grad():
+                val_out = model(val_x)
+                val_loss = criterion(val_out, val_y)
+            model.train()
+
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                best_state = model.state_dict()
+                no_improve = 0
+            else:
+                no_improve += 1
+
+            if no_improve >= patience:
+                if show_progress:
+                    iterator.write(f"Early stopping at iter {i+1}, best val loss: {best_val_loss:.4f}")
+
+                model.load_state_dict(best_state)
+                break
+
+        if show_progress:
+            postfix = {'train_loss': loss.item()}
+            if early_stopping and (i + 1) % val_check_interval == 0:
+                postfix['val_loss'] = best_val_loss.item() if best_state is not None else None
+            iterator.set_postfix(**postfix)
 
     return model
 
@@ -932,4 +971,102 @@ def train_dgp_minibatch(
 
     model.load_state_dict(best_state)
     model.eval()
+    return model
+
+
+
+
+
+
+def train_BNN_minibatch(
+    NN_model,
+    full_train_x,
+    full_train_y,
+    num_iterations=50000,
+    batch_size=256,
+    device='cuda',
+    show_progress=True,
+    weight_decay=0.2,
+    val_x=None,
+    val_y=None,
+    early_stopping=False,
+    patience=1000,
+    val_check_interval=100
+):
+
+    full_train_x = full_train_x.to(device)
+    full_train_y = full_train_y.to(device)
+    if early_stopping and (val_x is not None and val_y is not None):
+        val_x = val_x.to(device)
+        val_y = val_y.to(device)
+    else:
+        early_stopping = False
+
+    dataset = TensorDataset(full_train_x, full_train_y)
+    loader  = DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=True)
+
+    model = NN_model(full_train_x, full_train_y).to(device)
+    model.train()
+    criterion = torch.nn.MSELoss()
+    optimizer = torch.optim.Adam(
+        model.parameters(),
+        lr=0.2,
+        weight_decay=weight_decay
+    )
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode='min', factor=0.5, patience=100
+    )
+
+    best_val_loss = float('inf')
+    best_state    = None
+    no_improve    = 0
+
+
+    step = 0
+    pbar = tqdm.tqdm(total=num_iterations, disable=not show_progress, desc="training")
+    while step < num_iterations:
+        for batch_x, batch_y in loader:
+
+            batch_x = batch_x.to(device)
+            batch_y = batch_y.to(device)
+
+            optimizer.zero_grad()
+            out = model(batch_x)
+            loss = -out.log_prob(batch_y).mean()
+
+            loss.backward()
+            optimizer.step()
+            scheduler.step(loss)
+
+            step += 1
+            pbar.update(1)
+
+            if early_stopping and (step % val_check_interval == 0):
+                model.eval()
+                with torch.no_grad():
+                    val_out  = model(val_x)
+                    val_loss = -val_out.log_prob(val_y).mean()
+                model.train()
+
+                if val_loss < best_val_loss:
+                    best_val_loss = val_loss
+                    best_state    = model.state_dict()
+                    no_improve    = 0
+                else:
+                    no_improve += 1
+
+                if no_improve >= patience:
+                    if show_progress:
+                        pbar.write(
+                            f"Early stopping at step {step}, best val loss: {best_val_loss:.4f}"
+                        )
+
+                    model.load_state_dict(best_state)
+                    pbar.close()
+                    return model
+
+            if step >= num_iterations:
+                break
+
+    pbar.close()
     return model
