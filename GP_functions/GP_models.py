@@ -562,7 +562,7 @@ class DGPHiddenLayer(gpytorch.models.deep_gps.DeepGPLayer):
 
         super().__init__(variational_strategy, input_dims, output_dims)
         
-        self.mean_module = gpytorch.means.ZeroMean() if linear_mean else gpytorch.means.LinearMean(input_dims)
+        self.mean_module = gpytorch.means.LinearMean(input_dims) if linear_mean else gpytorch.means.ZeroMean()
         
         if covar_type == 'Matern5/2':
             base_kernel = gpytorch.kernels.MaternKernel(nu=2.5,
@@ -612,14 +612,14 @@ class DeepGP2(gpytorch.models.deep_gps.DeepGP):
             output_dims=hidden_dim,
             num_inducing=inducing_num,
             covar_type=covar_types[0],
+            linear_mean=True,
             train_x_for_init=train_x,
         )
         layer2 = DGPHiddenLayer(
             input_dims=hidden_dim,
             output_dims=num_tasks,
             num_inducing=inducing_num,
-            covar_type=covar_types[1],
-            linear_mean=True,
+            covar_type=covar_types[1],            
             train_x_for_init=train_x,
         )
 
@@ -635,4 +635,119 @@ class DeepGP2(gpytorch.models.deep_gps.DeepGP):
         # with gpytorch.settings.fast_pred_var():
         preds = self.likelihood(self(test_x)).to_data_independent_dist()
 
+        return preds.mean.mean(0).squeeze(), preds.variance.mean(0).squeeze()
+
+
+
+class DeepGP3(gpytorch.models.deep_gps.DeepGP):
+
+    def __init__(
+        self,
+        train_x,
+        train_y,
+        hidden_dims=[4, 4],
+        inducing_num=512,
+        covar_types=None,
+    ):
+        num_tasks = train_y.size(-1)
+        covar_types = covar_types or ["RBF"] * 3
+        
+
+
+        layer1 = DGPHiddenLayer(
+            input_dims=train_x.size(-1),
+            output_dims=hidden_dims[0],
+            num_inducing=inducing_num,
+            covar_type=covar_types[0],
+            train_x_for_init=train_x,
+        )
+
+        layer2 = DGPHiddenLayer(
+            input_dims=hidden_dims[0],
+            output_dims=hidden_dims[1],
+            num_inducing=inducing_num,
+            covar_type=covar_types[1],
+            train_x_for_init=train_x,
+        )
+
+        layer3 = DGPHiddenLayer(
+            input_dims=hidden_dims[1],
+            output_dims=num_tasks,
+            num_inducing=inducing_num,
+            covar_type=covar_types[2],
+            linear_mean=True,
+            train_x_for_init=train_x,
+        )
+
+        super().__init__()
+        self.layers = torch.nn.ModuleList([layer1, layer2, layer3])
+        self.likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(num_tasks=num_tasks)
+
+    def forward(self, x):
+        for layer in self.layers:
+            x = layer(x)
+        return x
+
+    def predict(self, test_x):
+        preds = self.likelihood(self(test_x)).to_data_independent_dist()
+        return preds.mean.mean(0).squeeze(), preds.variance.mean(0).squeeze()
+    
+class DeepGP4(gpytorch.models.deep_gps.DeepGP):
+
+    def __init__(
+        self,
+        train_x,
+        train_y,
+        hidden_dims=[4, 4, 4],
+        inducing_num=512,
+        covar_types=None,
+    ):
+        num_tasks = train_y.size(-1)
+        covar_types = covar_types or ["RBF"] * 4
+
+
+        layer1 = DGPHiddenLayer(
+            input_dims=train_x.size(-1),
+            output_dims=hidden_dims[0],
+            num_inducing=inducing_num,
+            covar_type=covar_types[0],
+            train_x_for_init=train_x,
+        )
+
+        layer2 = DGPHiddenLayer(
+            input_dims=hidden_dims[0],
+            output_dims=hidden_dims[1],
+            num_inducing=inducing_num,
+            covar_type=covar_types[1],
+            train_x_for_init=train_x,
+        )
+
+        layer3 = DGPHiddenLayer(
+            input_dims=hidden_dims[1],
+            output_dims=hidden_dims[2],
+            num_inducing=inducing_num,
+            covar_type=covar_types[2],
+            train_x_for_init=train_x,
+        )
+
+        layer4 = DGPHiddenLayer(
+            input_dims=hidden_dims[2],
+            output_dims=num_tasks,
+            num_inducing=inducing_num,
+            covar_type=covar_types[3],
+            linear_mean=True,
+            train_x_for_init=train_x,
+        )
+
+        super().__init__()
+        self.layers = torch.nn.ModuleList([layer1, layer2, layer3, layer4])
+        self.likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(num_tasks=num_tasks)
+
+    def forward(self, x):
+        for layer in self.layers:
+            x = layer(x)
+        return x
+
+    def predict(self, test_x):
+        preds = self.likelihood(self(test_x)).to_data_independent_dist()
         return preds.mean.mean(0).squeeze(), preds.variance.mean(0).squeeze()
