@@ -23,6 +23,10 @@ import GP_functions.Tools as Tools
 
 from joblib import Parallel, delayed
 
+import pyro
+from pyro.infer import SVI, Trace_ELBO, Predictive
+from pyro.infer.autoguide import AutoDiagonalNormal
+from pyro.optim import ClippedAdam
 
 
 #############################################################################
@@ -893,10 +897,12 @@ def evaluate_full_dataset_loss_dgp(model, x_data, y_data, mll, device='cuda', ba
 
 
 def train_dgp_minibatch(
+    DGP_model,
     train_x,
     train_y,
     hidden_dim = 4,
     inducing_num = 512,
+    covar_types = ["RBF"],
     num_iterations = 3000,
     patience = 100,
     batch_size = 256,
@@ -907,8 +913,8 @@ def train_dgp_minibatch(
 ):
     train_x, train_y = train_x.to(device), train_y.to(device)
 
-    model = GP_models.DeepGP2(
-        train_x, train_y, hidden_dim, inducing_num
+    model = DGP_model(
+        train_x, train_y, hidden_dim, inducing_num, covar_types
     ).to(device)
 
     model.train()
@@ -978,95 +984,83 @@ def train_dgp_minibatch(
 
 
 
+
+
 def train_BNN_minibatch(
     NN_model,
     full_train_x,
     full_train_y,
-    num_iterations=50000,
-    batch_size=256,
-    device='cuda',
-    show_progress=True,
-    weight_decay=0.2,
+    num_iterations: int = 50000,
+    batch_size: int = 256,
+    device: str = 'cuda',
+    show_progress: bool = True,
+    lr: float = 1e-2,
     val_x=None,
     val_y=None,
-    early_stopping=False,
-    patience=1000,
-    val_check_interval=100
+    early_stopping: bool = False,
+    patience: int = 1000,
+    val_check_interval: int = 1000
 ):
-
+    # Move data to device
     full_train_x = full_train_x.to(device)
     full_train_y = full_train_y.to(device)
     if early_stopping and (val_x is not None and val_y is not None):
-        val_x = val_x.to(device)
-        val_y = val_y.to(device)
+        val_x, val_y = val_x.to(device), val_y.to(device)
     else:
         early_stopping = False
 
+    # Pyro setup
+    pyro.clear_param_store()
+    model = NN_model(full_train_x, full_train_y).to(device)
+    guide = AutoDiagonalNormal(model)
+    optim = ClippedAdam({'lr': lr})
+    svi = SVI(model, guide, optim, loss=Trace_ELBO())
+
+    # DataLoader
     dataset = TensorDataset(full_train_x, full_train_y)
     loader  = DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=True)
 
-    model = NN_model(full_train_x, full_train_y).to(device)
-    model.train()
-    criterion = torch.nn.MSELoss()
-    optimizer = torch.optim.Adam(
-        model.parameters(),
-        lr=0.2,
-        weight_decay=weight_decay
-    )
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=0.5, patience=100
-    )
-
+    # Early-stopping bookkeeping
     best_val_loss = float('inf')
-    best_state    = None
-    no_improve    = 0
+    best_state   = None
+    no_improve   = 0
 
-
-    step = 0
-    pbar = tqdm.tqdm(total=num_iterations, disable=not show_progress, desc="training")
-    while step < num_iterations:
+    pbar = tqdm.tqdm(total=num_iterations, disable=not show_progress, desc="SVI training")
+    it = 0
+    while it < num_iterations:
         for batch_x, batch_y in loader:
-
-            batch_x = batch_x.to(device)
-            batch_y = batch_y.to(device)
-
-            optimizer.zero_grad()
-            out = model(batch_x)
-            loss = -out.log_prob(batch_y).mean()
-
-            loss.backward()
-            optimizer.step()
-            scheduler.step(loss)
-
-            step += 1
+            it += 1
+            loss = svi.step(batch_x, batch_y)  # grads + step
             pbar.update(1)
 
-            if early_stopping and (step % val_check_interval == 0):
-                model.eval()
-                with torch.no_grad():
-                    val_out  = model(val_x)
-                    val_loss = -val_out.log_prob(val_y).mean()
-                model.train()
-
+            # Validation check
+            if early_stopping and (it % val_check_interval == 0):
+                # ELBO on the *whole* validation set
+                val_loss = svi.evaluate_loss(val_x, val_y) / val_x.size(0)
                 if val_loss < best_val_loss:
                     best_val_loss = val_loss
-                    best_state    = model.state_dict()
-                    no_improve    = 0
+                    best_state   = pyro.get_param_store().get_state()
+                    no_improve   = 0
                 else:
                     no_improve += 1
-
                 if no_improve >= patience:
                     if show_progress:
-                        pbar.write(
-                            f"Early stopping at step {step}, best val loss: {best_val_loss:.4f}"
-                        )
-
-                    model.load_state_dict(best_state)
+                        pbar.write(f"Early stopping at iter {it}, val_loss={best_val_loss:.4f}")
+                    # restore best
+                    pyro.get_param_store().set_state(best_state)
                     pbar.close()
-                    return model
+                    return model, guide
 
-            if step >= num_iterations:
+            if it >= num_iterations:
                 break
 
     pbar.close()
-    return model
+    return model, guide
+
+
+# Example of later using the trained model+guide:
+# from pyro.infer import Predictive
+# predictive = Predictive(model, guide, num_samples=100)
+# posterior_samples = predictive(new_x)
+# pred_mean = posterior_samples["obs"].mean(0)
+# pred_std  = posterior_samples["obs"].std(0)
