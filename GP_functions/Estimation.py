@@ -344,6 +344,41 @@ def estimate_params_for_NN_Adam(NN_model, row_idx, test_y, initial_guess, param_
 
 
 
+def multi_start_estimation_DModel(model, row_idx, test_y, param_ranges, estimate_function, num_starts=5, num_iterations=1000, lr=0.05, patience=50, attraction_threshold=0.1, repulsion_strength=0.1, device='cpu'):
+    best_overall_loss = float('inf')
+    best_overall_state = None
+
+    dim = len(param_ranges)
+    sobol = torch.quasirandom.SobolEngine(dim, scramble=False)
+    sobol_samples = sobol.draw(num_starts)  # shape: [num_starts, dim]
+
+    for start in range(num_starts):
+        sample = sobol_samples[start]
+
+        initial_guess = [
+            min_val + s.item() * (max_val - min_val)
+            for s, (min_val, max_val) in zip(sample, param_ranges)
+        ]
+
+
+        estimated_params, loss = estimate_function(
+            model, row_idx, test_y, initial_guess, param_ranges,
+            num_iterations=num_iterations, lr=lr, patience=patience,
+            attraction_threshold=attraction_threshold, repulsion_strength=repulsion_strength, device=device
+        )
+
+        if loss < best_overall_loss:
+            best_overall_loss = loss
+            best_overall_state = estimated_params
+
+    return best_overall_state.detach().numpy(), best_overall_loss
+
+
+
+
+
+
+
 #############################################
 ##
 #############################################
