@@ -35,6 +35,7 @@ import GP_functions.NN_models as NN_models
 import GP_functions.Tools as Tools
 import GP_functions.FeatureE as FeatureE
 
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 X_train = pd.read_csv('Data/X_train.csv', header=None, delimiter=',').values
 X_test = pd.read_csv('Data/X_test.csv', header=None, delimiter=',').values
@@ -46,11 +47,18 @@ Y_train = pd.read_csv('Data/Y_train_std.csv', header=None, delimiter=',').values
 Y_test = pd.read_csv('Data/Y_test_std.csv', header=None, delimiter=',').values
 
 
-train_x = torch.tensor(X_train, dtype=torch.float32)
-test_x = torch.tensor(X_test, dtype=torch.float32)
+# train_x = torch.tensor(X_train, dtype=torch.float32)
+# test_x = torch.tensor(X_test, dtype=torch.float32)
 
-train_y_21 = torch.tensor(Y_train_21, dtype=torch.float32)
-test_y_21 = torch.tensor(Y_test_21, dtype=torch.float32)
+# train_y_21 = torch.tensor(Y_train_21, dtype=torch.float32)
+# test_y_21 = torch.tensor(Y_test_21, dtype=torch.float32)
+
+
+train_x = torch.from_numpy(X_train).float().to(device)
+test_x  = torch.from_numpy(X_test).float().to(device)
+train_y_21 = torch.from_numpy(Y_train_21).float().to(device)
+test_y_21  = torch.from_numpy(Y_test_21).float().to(device)
+
 
 # train_y = torch.tensor(Y_train, dtype=torch.float32)
 # test_y = torch.tensor(Y_test, dtype=torch.float32)
@@ -59,10 +67,12 @@ test_y_21 = torch.tensor(Y_test_21, dtype=torch.float32)
 # torch.set_default_dtype(torch.float32)
 
 
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
 
 def evaluate_mse(model, x, y):
     model.eval()
+    x = x.to(device)
+    y = y.to(device)
     with torch.no_grad():
         # model(x) returns a Distribution when y=None
         pred_dist = model(x)
@@ -73,7 +83,7 @@ def evaluate_mse(model, x, y):
 # Dictionary of your model classes
 model_classes = {
     'Deep': NN_models.BNN_Deep,
-    'WideDrop': NN_models.BNN_WideDrop,
+    'BNN_2': NN_models.BNN_2,
     'ARD': NN_models.BNN_ARD
 }
 
@@ -91,13 +101,15 @@ for name, ModelClass in model_classes.items():
         NN_model=ModelClass,
         full_train_x=train_x,
         full_train_y=train_y_21,
-        num_iterations=20000,       # adjust as needed
+        num_iterations=50000,       # adjust as needed
         batch_size=256,
         device=device,
         show_progress=True,
         lr=1e-2,
         early_stopping=False
     )
+    model.to(device)
+    guide.to(device)
     mse = evaluate_mse(model, test_x, test_y_21)
     print(f"{name} MSE on test set: {mse:.4f}")
     
