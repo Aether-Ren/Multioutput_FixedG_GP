@@ -206,6 +206,9 @@ class BNN_2(PyroModule):
     
 
 
+    
+
+
 
 
 
@@ -385,20 +388,17 @@ class BNN_ARD(PyroModule):
     def __init__(self, train_x, train_y):
         super().__init__()
 
-        # Determine input/output dims and device
+        # 输入、输出维度与设备
         in_dim  = train_x.size(-1)
         out_dim = train_y.size(-1)
         device  = train_x.device
+        self.device = device          # 记录设备，forward 里直接用
 
-        # ARD prior scales
-        self.tau1 = PyroSample(
-            dist.HalfCauchy(scale=torch.tensor(1.0, device=device))
-        )
-        self.tau2 = PyroSample(
-            dist.HalfCauchy(scale=torch.tensor(1.0, device=device))
-        )
+        # ARD 先验尺度
+        self.tau1 = PyroSample(dist.HalfCauchy(scale=torch.tensor(1.0, device=device)))
+        self.tau2 = PyroSample(dist.HalfCauchy(scale=torch.tensor(1.0, device=device)))
 
-        # First layer with ARD prior
+        # 第一层
         self.fc1 = PyroModule[nn.Linear](in_dim, 200).to(device)
         self.fc1.weight = PyroSample(
             lambda self: dist.Normal(
@@ -413,7 +413,7 @@ class BNN_ARD(PyroModule):
             ).to_event(1)
         )
 
-        # Second layer with ARD prior
+        # 第二层
         self.fc2 = PyroModule[nn.Linear](200, 200).to(device)
         self.fc2.weight = PyroSample(
             lambda self: dist.Normal(
@@ -428,7 +428,7 @@ class BNN_ARD(PyroModule):
             ).to_event(1)
         )
 
-        # Output layer
+        # 输出层
         self.fc3 = PyroModule[nn.Linear](200, out_dim).to(device)
         self.fc3.weight = PyroSample(
             dist.Normal(
@@ -443,20 +443,24 @@ class BNN_ARD(PyroModule):
             ).to_event(1)
         )
 
-        # Observation noise
-        self.sigma = PyroSample(
-            dist.HalfCauchy(scale=torch.tensor(1.0, device=device))
-        )
+        # 观测噪声
+        self.sigma = PyroSample(dist.HalfCauchy(scale=torch.tensor(1.0, device=device)))
 
-        # Activation
+        # 激活
         self.relu = nn.ReLU().to(device)
 
     def forward(self, x, y=None):
-        x = x.to(next(self.parameters()).device)
+        # 确保数据在同一设备
+        if x.device != self.device:
+            x = x.to(self.device)
+
         x = self.relu(self.fc1(x))
         x = self.relu(self.fc2(x))
         mean = self.fc3(x)
+
         dist_pred = dist.Normal(mean, self.sigma).to_event(1)
         with pyro.plate("data", x.size(0)):
             pyro.sample("obs", dist_pred, obs=y)
+
         return mean if y is not None else dist_pred
+
