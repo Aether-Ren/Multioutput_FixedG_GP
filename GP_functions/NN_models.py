@@ -210,7 +210,7 @@ class BNN_2(PyroModule):
 
 
 
-class BNN_Deep(PyroModule):
+class BNN_3(PyroModule):
     def __init__(self, train_x, train_y):
         super().__init__()
 
@@ -392,43 +392,39 @@ class BNN_ARD(PyroModule):
 
         # ARD prior scales
         self.tau1 = PyroSample(
-            dist.HalfCauchy(
-                scale=torch.tensor(1.0, device=device)
-            )
+            dist.HalfCauchy(scale=torch.tensor(1.0, device=device))
         )
         self.tau2 = PyroSample(
-            dist.HalfCauchy(
-                scale=torch.tensor(1.0, device=device)
-            )
+            dist.HalfCauchy(scale=torch.tensor(1.0, device=device))
         )
 
         # First layer with ARD prior
         self.fc1 = PyroModule[nn.Linear](in_dim, 200).to(device)
         self.fc1.weight = PyroSample(
-            lambda tau1=self.tau1: dist.Normal(
-                torch.zeros(200, in_dim, device=device),
-                torch.ones(200, in_dim, device=device) * tau1
+            lambda self: dist.Normal(
+                torch.zeros(200, in_dim, device=self.tau1.device),
+                torch.ones(200, in_dim, device=self.tau1.device) * self.tau1
             ).to_event(2)
         )
         self.fc1.bias = PyroSample(
-            lambda tau1=self.tau1: dist.Normal(
-                torch.zeros(200, device=device),
-                torch.ones(200, device=device) * tau1
+            lambda self: dist.Normal(
+                torch.zeros(200, device=self.tau1.device),
+                torch.ones(200, device=self.tau1.device) * self.tau1
             ).to_event(1)
         )
 
         # Second layer with ARD prior
         self.fc2 = PyroModule[nn.Linear](200, 200).to(device)
         self.fc2.weight = PyroSample(
-            lambda tau2=self.tau2: dist.Normal(
-                torch.zeros(200, 200, device=device),
-                torch.ones(200, 200, device=device) * tau2
+            lambda self: dist.Normal(
+                torch.zeros(200, 200, device=self.tau2.device),
+                torch.ones(200, 200, device=self.tau2.device) * self.tau2
             ).to_event(2)
         )
         self.fc2.bias = PyroSample(
-            lambda tau2=self.tau2: dist.Normal(
-                torch.zeros(200, device=device),
-                torch.ones(200, device=device) * tau2
+            lambda self: dist.Normal(
+                torch.zeros(200, device=self.tau2.device),
+                torch.ones(200, device=self.tau2.device) * self.tau2
             ).to_event(1)
         )
 
@@ -449,9 +445,7 @@ class BNN_ARD(PyroModule):
 
         # Observation noise
         self.sigma = PyroSample(
-            dist.HalfCauchy(
-                scale=torch.tensor(1.0, device=device)
-            )
+            dist.HalfCauchy(scale=torch.tensor(1.0, device=device))
         )
 
         # Activation

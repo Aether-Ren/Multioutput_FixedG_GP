@@ -371,7 +371,7 @@ def multi_start_estimation_DModel(model, row_idx, test_y, param_ranges, estimate
             best_overall_loss = loss
             best_overall_state = estimated_params
 
-    return best_overall_state.detach().numpy(), best_overall_loss
+    return best_overall_state.cpu().detach().numpy(), best_overall_loss
 
 
 

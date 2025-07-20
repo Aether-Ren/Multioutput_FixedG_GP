@@ -82,12 +82,10 @@ for row_idx in range(test_y_21.shape[0]):
                                                                    patience=10, attraction_threshold=0.1, repulsion_strength=0.1, device=Device)
 
     with open(output_file, 'a') as f:
-        f.write(f"{row_idx + 1},\"{list(preds_tmp)}\",\"{list(estimated_params_tmp.detach().numpy())}\"\n")
+        f.write(f"{row_idx + 1},\"{list(preds_tmp)}\",\"{list(estimated_params_tmp)}\"\n")
         # f.write(f"{row_idx + 1},\"{list(preds_tmp)}\",\"{list(estimated_params_tmp)}\"\n")
 
 
 
 
 
-
-# nohup python DNN_21.py > DNN_21out.log 2>&1 &
