@@ -82,9 +82,10 @@ def evaluate_mse(model, x, y):
 
 # Dictionary of your model classes
 model_classes = {
-    'Deep': NN_models.BNN_Deep,
     'BNN_2': NN_models.BNN_2,
-    'ARD': NN_models.BNN_ARD
+    'BNN_3': NN_models.BNN_3,
+    'BNN_4': NN_models.BNN_4,
+    'BNN_5': NN_models.BNN_5
 }
 
 results = {}
