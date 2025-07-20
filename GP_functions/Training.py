@@ -1055,6 +1055,7 @@ def train_BNN_minibatch(
                 break
 
     pbar.close()
+    
     return model, guide
 
 
