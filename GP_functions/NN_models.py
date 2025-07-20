@@ -307,6 +307,176 @@ class BNN_3(PyroModule):
 
 
 
+
+class BNN_4(PyroModule):
+    def __init__(self, train_x, train_y):
+        super().__init__()
+        # input/output dims and device
+        in_dim = train_x.size(-1)
+        out_dim = train_y.size(-1)
+        device = train_x.device
+
+        # four hidden layers, each of size 200
+        self.fc1 = PyroModule[nn.Linear](in_dim, 200).to(device)
+        self.fc1.weight = PyroSample(dist.Normal(
+            torch.zeros(200, in_dim, device=device),
+            torch.ones(200, in_dim, device=device) * 0.1
+        ).to_event(2))
+        self.fc1.bias = PyroSample(dist.Normal(
+            torch.zeros(200, device=device),
+            torch.ones(200, device=device) * 0.1
+        ).to_event(1))
+        self.bn1 = nn.BatchNorm1d(200).to(device)
+
+        self.fc2 = PyroModule[nn.Linear](200, 200).to(device)
+        self.fc2.weight = PyroSample(dist.Normal(
+            torch.zeros(200, 200, device=device),
+            torch.ones(200, 200, device=device) * 0.1
+        ).to_event(2))
+        self.fc2.bias = PyroSample(dist.Normal(
+            torch.zeros(200, device=device),
+            torch.ones(200, device=device) * 0.1
+        ).to_event(1))
+        self.bn2 = nn.BatchNorm1d(200).to(device)
+
+        self.fc3 = PyroModule[nn.Linear](200, 200).to(device)
+        self.fc3.weight = PyroSample(dist.Normal(
+            torch.zeros(200, 200, device=device),
+            torch.ones(200, 200, device=device) * 0.1
+        ).to_event(2))
+        self.fc3.bias = PyroSample(dist.Normal(
+            torch.zeros(200, device=device),
+            torch.ones(200, device=device) * 0.1
+        ).to_event(1))
+        self.bn3 = nn.BatchNorm1d(200).to(device)
+
+        self.fc4 = PyroModule[nn.Linear](200, 200).to(device)
+        self.fc4.weight = PyroSample(dist.Normal(
+            torch.zeros(200, 200, device=device),
+            torch.ones(200, 200, device=device) * 0.1
+        ).to_event(2))
+        self.fc4.bias = PyroSample(dist.Normal(
+            torch.zeros(200, device=device),
+            torch.ones(200, device=device) * 0.1
+        ).to_event(1))
+        self.bn4 = nn.BatchNorm1d(200).to(device)
+
+        self.fc5 = PyroModule[nn.Linear](200, out_dim).to(device)
+        self.fc5.weight = PyroSample(dist.Normal(
+            torch.zeros(out_dim, 200, device=device),
+            torch.ones(out_dim, 200, device=device) * 0.1
+        ).to_event(2))
+        self.fc5.bias = PyroSample(dist.Normal(
+            torch.zeros(out_dim, device=device),
+            torch.ones(out_dim, device=device) * 0.1
+        ).to_event(1))
+
+        self.sigma = PyroSample(dist.HalfCauchy(torch.tensor(1.0, device=device)))
+        self.relu = nn.ReLU().to(device)
+
+    def forward(self, x, y=None):
+        x = self.relu(self.bn1(self.fc1(x)))
+        x = self.relu(self.bn2(self.fc2(x)))
+        x = self.relu(self.bn3(self.fc3(x)))
+        x = self.relu(self.bn4(self.fc4(x)))
+        mean = self.fc5(x)
+        dist_pred = dist.Normal(mean, self.sigma).to_event(1)
+        with pyro.plate("data", x.size(0)):
+            pyro.sample("obs", dist_pred, obs=y)
+        return mean if y is not None else dist_pred
+
+
+class BNN_5(PyroModule):
+    def __init__(self, train_x, train_y):
+        super().__init__()
+        # input/output dims and device
+        in_dim = train_x.size(-1)
+        out_dim = train_y.size(-1)
+        device = train_x.device
+
+        # five hidden layers, each of size 200
+        self.fc1 = PyroModule[nn.Linear](in_dim, 200).to(device)
+        self.fc1.weight = PyroSample(dist.Normal(
+            torch.zeros(200, in_dim, device=device),
+            torch.ones(200, in_dim, device=device) * 0.1
+        ).to_event(2))
+        self.fc1.bias = PyroSample(dist.Normal(
+            torch.zeros(200, device=device),
+            torch.ones(200, device=device) * 0.1
+        ).to_event(1))
+        self.bn1 = nn.BatchNorm1d(200).to(device)
+
+        self.fc2 = PyroModule[nn.Linear](200, 200).to(device)
+        self.fc2.weight = PyroSample(dist.Normal(
+            torch.zeros(200, 200, device=device),
+            torch.ones(200, 200, device=device) * 0.1
+        ).to_event(2))
+        self.fc2.bias = PyroSample(dist.Normal(
+            torch.zeros(200, device=device),
+            torch.ones(200, device=device) * 0.1
+        ).to_event(1))
+        self.bn2 = nn.BatchNorm1d(200).to(device)
+
+        self.fc3 = PyroModule[nn.Linear](200, 200).to(device)
+        self.fc3.weight = PyroSample(dist.Normal(
+            torch.zeros(200, 200, device=device),
+            torch.ones(200, 200, device=device) * 0.1
+        ).to_event(2))
+        self.fc3.bias = PyroSample(dist.Normal(
+            torch.zeros(200, device=device),
+            torch.ones(200, device=device) * 0.1
+        ).to_event(1))
+        self.bn3 = nn.BatchNorm1d(200).to(device)
+
+        self.fc4 = PyroModule[nn.Linear](200, 200).to(device)
+        self.fc4.weight = PyroSample(dist.Normal(
+            torch.zeros(200, 200, device=device),
+            torch.ones(200, 200, device=device) * 0.1
+        ).to_event(2))
+        self.fc4.bias = PyroSample(dist.Normal(
+            torch.zeros(200, device=device),
+            torch.ones(200, device=device) * 0.1
+        ).to_event(1))
+        self.bn4 = nn.BatchNorm1d(200).to(device)
+
+        self.fc5 = PyroModule[nn.Linear](200, 200).to(device)
+        self.fc5.weight = PyroSample(dist.Normal(
+            torch.zeros(200, 200, device=device),
+            torch.ones(200, 200, device=device) * 0.1
+        ).to_event(2))
+        self.fc5.bias = PyroSample(dist.Normal(
+            torch.zeros(200, device=device),
+            torch.ones(200, device=device) * 0.1
+        ).to_event(1))
+        self.bn5 = nn.BatchNorm1d(200).to(device)
+
+        self.fc6 = PyroModule[nn.Linear](200, out_dim).to(device)
+        self.fc6.weight = PyroSample(dist.Normal(
+            torch.zeros(out_dim, 200, device=device),
+            torch.ones(out_dim, 200, device=device) * 0.1
+        ).to_event(2))
+        self.fc6.bias = PyroSample(dist.Normal(
+            torch.zeros(out_dim, device=device),
+            torch.ones(out_dim, device=device) * 0.1
+        ).to_event(1))
+
+        self.sigma = PyroSample(dist.HalfCauchy(torch.tensor(1.0, device=device)))
+        self.relu = nn.ReLU().to(device)
+
+    def forward(self, x, y=None):
+        x = self.relu(self.bn1(self.fc1(x)))
+        x = self.relu(self.bn2(self.fc2(x)))
+        x = self.relu(self.bn3(self.fc3(x)))
+        x = self.relu(self.bn4(self.fc4(x)))
+        x = self.relu(self.bn5(self.fc5(x)))
+        mean = self.fc6(x)
+        dist_pred = dist.Normal(mean, self.sigma).to_event(1)
+        with pyro.plate("data", x.size(0)):
+            pyro.sample("obs", dist_pred, obs=y)
+        return mean if y is not None else dist_pred
+
+
+
 class BNN_WideDrop(PyroModule):
     def __init__(self, train_x, train_y):
         super().__init__()
