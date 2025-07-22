@@ -84,7 +84,7 @@ for row_idx in range(test_y_21.shape[0]):
 
     estimated_params_tmp, _ = Estimation.multi_start_estimation(
         MVGP_models, MVGP_likelihoods, row_idx, test_y_21, bounds,
-        Estimation.estimate_params_for_one_model_Adam, num_starts=4, num_iterations=1000, lr=0.01,
+        Estimation.estimate_params_for_one_model_Adam, num_starts=16, num_iterations=2000, lr=0.01,
         patience=10, attraction_threshold=0.1, repulsion_strength=0.1, device=Device
     )
 

@@ -11,7 +11,7 @@ Description: Predict the reslut from Gaussian process models
 import torch
 import gpytorch
 
-
+from pyro.infer import Predictive
 
 #############################################################################
 ## 
@@ -101,4 +101,11 @@ def preds_for_DNN(model, xxx):
     preds = model(xxx)
     return preds
 
+
+
+
+def preds_distribution_for_BNN(model, Likelihood, xxx):
+    predictive = Predictive(model, guide=guide, 
+                            num_samples=1000)
+    return preds
 
