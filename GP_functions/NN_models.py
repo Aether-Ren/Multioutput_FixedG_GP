@@ -555,82 +555,73 @@ class BNN_WideDrop(PyroModule):
     
 
 class BNN_ARD(PyroModule):
-    def __init__(self, train_x, train_y):
+    def __init__(self, train_x, train_y, hidden_dim=200):
         super().__init__()
+        in_dim, out_dim = train_x.size(-1), train_y.size(-1)
 
-        # 输入、输出维度与设备
-        in_dim  = train_x.size(-1)
-        out_dim = train_y.size(-1)
-        device  = train_x.device
-        self.device = device          # 记录设备，forward 里直接用
+        # ------------ 线性层 ------------
+        self.fc1 = PyroModule[nn.Linear](in_dim, hidden_dim)
+        self.fc2 = PyroModule[nn.Linear](hidden_dim, hidden_dim)
+        self.fc3 = PyroModule[nn.Linear](hidden_dim, out_dim)
 
-        # ARD 先验尺度
-        self.tau1 = PyroSample(dist.HalfCauchy(scale=torch.tensor(1.0, device=device)))
-        self.tau2 = PyroSample(dist.HalfCauchy(scale=torch.tensor(1.0, device=device)))
+        # ------------ each layer: its own tau ------------
+        self.fc1.tau = PyroSample(dist.HalfCauchy(1.0))
+        self.fc2.tau = PyroSample(dist.HalfCauchy(1.0))
 
-        # 第一层
-        self.fc1 = PyroModule[nn.Linear](in_dim, 200).to(device)
+        # ----- fc1 priors -----
         self.fc1.weight = PyroSample(
-            lambda self: dist.Normal(
-                torch.zeros(200, in_dim, device=self.tau1.device),
-                torch.ones(200, in_dim, device=self.tau1.device) * self.tau1
+            lambda m: dist.Normal(
+                torch.zeros(m.out_features, m.in_features),
+                m.tau.expand(m.out_features, m.in_features)
             ).to_event(2)
         )
         self.fc1.bias = PyroSample(
-            lambda self: dist.Normal(
-                torch.zeros(200, device=self.tau1.device),
-                torch.ones(200, device=self.tau1.device) * self.tau1
+            lambda m: dist.Normal(
+                torch.zeros(m.out_features),
+                m.tau.expand(m.out_features)
             ).to_event(1)
         )
 
-        # 第二层
-        self.fc2 = PyroModule[nn.Linear](200, 200).to(device)
+        # ----- fc2 priors -----
         self.fc2.weight = PyroSample(
-            lambda self: dist.Normal(
-                torch.zeros(200, 200, device=self.tau2.device),
-                torch.ones(200, 200, device=self.tau2.device) * self.tau2
+            lambda m: dist.Normal(
+                torch.zeros(m.out_features, m.in_features),
+                m.tau.expand(m.out_features, m.in_features)
             ).to_event(2)
         )
         self.fc2.bias = PyroSample(
-            lambda self: dist.Normal(
-                torch.zeros(200, device=self.tau2.device),
-                torch.ones(200, device=self.tau2.device) * self.tau2
+            lambda m: dist.Normal(
+                torch.zeros(m.out_features),
+                m.tau.expand(m.out_features)
             ).to_event(1)
         )
 
-        # 输出层
-        self.fc3 = PyroModule[nn.Linear](200, out_dim).to(device)
+        # ----- fc3 priors (weakly informative) -----
         self.fc3.weight = PyroSample(
-            dist.Normal(
-                torch.zeros(out_dim, 200, device=device),
-                torch.ones(out_dim, 200, device=device) * 0.1
+            lambda m: dist.Normal(
+                torch.zeros(m.out_features, m.in_features),
+                0.1 * torch.ones(m.out_features, m.in_features)
             ).to_event(2)
         )
         self.fc3.bias = PyroSample(
-            dist.Normal(
-                torch.zeros(out_dim, device=device),
-                torch.ones(out_dim, device=device) * 0.1
+            lambda m: dist.Normal(
+                torch.zeros(m.out_features),
+                0.1 * torch.ones(m.out_features)
             ).to_event(1)
         )
 
-        # 观测噪声
-        self.sigma = PyroSample(dist.HalfCauchy(scale=torch.tensor(1.0, device=device)))
-
-        # 激活
-        self.relu = nn.ReLU().to(device)
+        # ------------ noise ------------
+        self.sigma = PyroSample(dist.HalfCauchy(1.0))
+        self.act = nn.ReLU()
 
     def forward(self, x, y=None):
-        # 确保数据在同一设备
-        if x.device != self.device:
-            x = x.to(self.device)
-
-        x = self.relu(self.fc1(x))
-        x = self.relu(self.fc2(x))
+        x = self.act(self.fc1(x))
+        x = self.act(self.fc2(x))
         mean = self.fc3(x)
 
-        dist_pred = dist.Normal(mean, self.sigma).to_event(1)
+        pred = dist.Normal(mean, self.sigma).to_event(1)
         with pyro.plate("data", x.size(0)):
-            pyro.sample("obs", dist_pred, obs=y)
+            pyro.sample("obs", pred, obs=y)
 
-        return mean if y is not None else dist_pred
+        return mean if y is not None else pred
 
