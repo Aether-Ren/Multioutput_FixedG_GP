@@ -41,46 +41,61 @@ torch.set_default_dtype(torch.float32)
 
 ####################################################################
 
-Device = 'cpu'
+Device = 'cuda'
 
 
-output_file = 'Result/VGP_21_result.csv'
+output_file = 'Result/DGP_21_point_result.csv'
 
 
 if not os.path.exists(output_file):
     with open(output_file, 'w') as f:
         f.write('Iteration,test_preds,estimated_params\n')
 
+# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+train_x, train_y_21 = train_x.to(Device), train_y_21.to(Device)
+test_x, test_y_21 = test_x.to(Device), test_y_21.to(Device)
 
-inducing_points = train_x[:500, :].to(Device)
+ckpt_path = 'final_dgp_2_checkpoint_21.pth'
+checkpoint = torch.load(ckpt_path, map_location=Device)
 
-VGP_models, VGP_likelihoods = Training.train_full_VGP(
-    train_x, train_y_21, inducing_points = inducing_points, 
-    covar_type = 'RBF', lr=0.05, 
-    num_iterations=5000, patience=10, device = Device)
+state_dict   = checkpoint['model_state_dict']
+model_params = checkpoint['model_params']
+
+dgp_model = GP_models.DeepGP2(
+    train_x, train_y_21, 
+    hidden_dim = model_params['num_hidden_dgp_dims'], 
+    inducing_num = model_params['inducing_num'], 
+    covar_types = model_params['covar_types']
+).to(Device)
+
+dgp_model.load_state_dict(state_dict, strict=False)
+dgp_model.eval()
+dgp_model.likelihood.eval()
+
 
 for row_idx in range(test_y_21.shape[0]):
     input_point = test_y_21[row_idx, :]
 
-    local_train_x, local_train_y = Tools.find_k_nearest_neighbors_CPU(input_point, train_x, train_y_21, k=500)
+    local_train_x, local_train_y = Tools.find_k_nearest_neighbors_GPU(input_point, train_x, train_y_21, k=100)
 
+    with torch.no_grad(), gpytorch.settings.fast_pred_var():
+        mean, var = dgp_model.predict(test_x[row_idx,:].unsqueeze(0).to(Device))
 
-    preds_tmp = Prediction.full_preds(
-        VGP_models, VGP_likelihoods, test_x[row_idx,:].unsqueeze(0).to(Device)
-        ).cpu().detach().numpy()
+    preds_tmp = mean.cpu().detach().numpy()
+
 
     bounds = bound.get_bounds(local_train_x)
-
-    estimated_params_tmp, _ = Estimation.multi_start_estimation(
-        VGP_models, VGP_likelihoods, row_idx, test_y_21, bounds,
-        Estimation.estimate_params_Adam_VGP, num_starts=8, num_iterations=2000, lr=0.01,
-        patience=10, attraction_threshold=0.1, repulsion_strength=0.1, device=Device
-    )
+  
+    estimated_params_tmp, _ = Estimation.multi_start_estimation_DModel(dgp_model, row_idx, test_y_21, bounds,
+                                                                   Estimation.estimate_params_for_DGP_Adam, num_starts=8, num_iterations=2000, lr=0.01,
+                                                                   patience=10, attraction_threshold=0.1, repulsion_strength=0.1, device=Device)
 
     with open(output_file, 'a') as f:
         f.write(f"{row_idx + 1},\"{list(preds_tmp)}\",\"{list(estimated_params_tmp)}\"\n")
+        # f.write(f"{row_idx + 1},\"{list(preds_tmp)}\",\"{list(estimated_params_tmp)}\"\n")
 
 
 
 
-# nohup python VGP_21.py > VGP_21out.log 2>&1 &
+
+# nohup python DGP_21_point.py > DGP_21_pointout.log 2>&1 &
