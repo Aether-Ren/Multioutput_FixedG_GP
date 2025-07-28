@@ -73,7 +73,7 @@ for row_idx in range(test_y_21.shape[0]):
 
     estimated_params_tmp, _ = Estimation.multi_start_estimation(
         VGP_models, VGP_likelihoods, row_idx, test_y_21, bounds,
-        Estimation.estimate_params_Adam, num_starts=8, num_iterations=2000, lr=0.01,
+        Estimation.estimate_params_Adam_VGP, num_starts=8, num_iterations=2000, lr=0.01,
         patience=10, attraction_threshold=0.1, repulsion_strength=0.1, device=Device
     )
 
