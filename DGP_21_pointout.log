@@ -1,5 +1,0 @@
-nohup: ignoring input
-/home/pgrad1/2633042r/miniconda3/envs/GPyTorch/lib/python3.8/site-packages/linear_operator/utils/interpolation.py:71: UserWarning: The torch.cuda.*DtypeTensor constructors are no longer recommended. It's best to use methods such as torch.tensor(data, dtype=*, device='cuda') to create tensors. (Triggered internally at /opt/conda/conda-bld/pytorch_1704987301168/work/torch/csrc/tensor/python_tensor.cpp:83.)
-  summing_matrix = cls(summing_matrix_indices, summing_matrix_values, size)
-/home/pgrad1/2633042r/miniconda3/envs/GPyTorch/lib/python3.8/site-packages/linear_operator/utils/interpolation.py:71: UserWarning: torch.sparse.SparseTensor(indices, values, shape, *, device=) is deprecated.  Please use torch.sparse_coo_tensor(indices, values, shape, dtype=, device=). (Triggered internally at /opt/conda/conda-bld/pytorch_1704987301168/work/torch/csrc/utils/tensor_new.cpp:618.)
-  summing_matrix = cls(summing_matrix_indices, summing_matrix_values, size)
