@@ -32,15 +32,16 @@ Y_test_21 = pd.read_csv('Data/Y_test_std_21.csv', header=None, delimiter=',').va
 Y_train_std = pd.read_csv('Data/Y_train_std.csv', header=None, delimiter=',').values
 Y_test_std = pd.read_csv('Data/Y_test_std.csv', header=None, delimiter=',').values
 
+Device = 'cuda'
 
-train_x = torch.tensor(X_train, dtype=torch.float32)
-test_x = torch.tensor(X_test, dtype=torch.float32)
+train_x = torch.tensor(X_train, dtype=torch.float32, device=Device)
+test_x = torch.tensor(X_test, dtype=torch.float32, device=Device)
 
-train_y_21 = torch.tensor(Y_train_21, dtype=torch.float32)
-test_y_21 = torch.tensor(Y_test_21, dtype=torch.float32)
+train_y_21 = torch.tensor(Y_train_21, dtype=torch.float32, device=Device)
+test_y_21 = torch.tensor(Y_test_21, dtype=torch.float32, device=Device)
 
-train_y = torch.tensor(Y_train_std, dtype=torch.float32)
-test_y = torch.tensor(Y_test_std, dtype=torch.float32)
+train_y = torch.tensor(Y_train_std, dtype=torch.float32, device=Device)
+test_y = torch.tensor(Y_test_std, dtype=torch.float32, device=Device)
 
 
 torch.set_default_dtype(torch.float32)
@@ -80,7 +81,7 @@ def run_mcmc_Uniform_NN(Models, row_idx, test_y, bounds, num_sampling=2000, warm
     return mcmc
 
 
-Device = 'cuda'
+
 
 
 mcmc_dir = 'Result/DNN_21_mcmc_result'
