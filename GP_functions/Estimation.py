@@ -241,7 +241,7 @@ def multi_start_estimation(model, likelihood, row_idx, test_y, param_ranges, est
             best_overall_loss = loss
             best_overall_state = estimated_params
 
-    return best_overall_state.detach().numpy(), best_overall_loss
+    return best_overall_state.cpu().detach().numpy(), best_overall_loss
 
 
 
