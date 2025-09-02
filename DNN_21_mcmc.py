@@ -32,7 +32,7 @@ Y_test_21 = pd.read_csv('Data/Y_test_std_21.csv', header=None, delimiter=',').va
 Y_train_std = pd.read_csv('Data/Y_train_std.csv', header=None, delimiter=',').values
 Y_test_std = pd.read_csv('Data/Y_test_std.csv', header=None, delimiter=',').values
 
-Device = 'cuda'
+Device = 'cpu'
 
 train_x = torch.tensor(X_train, dtype=torch.float32, device=Device)
 test_x = torch.tensor(X_test, dtype=torch.float32, device=Device)

@@ -10,7 +10,7 @@ Description: Predict the reslut from Gaussian process models
 #############################################################################
 import torch
 import gpytorch
-
+import pyro
 from pyro.infer import Predictive
 
 #############################################################################
@@ -109,3 +109,33 @@ def preds_distribution_for_BNN(model, Likelihood, xxx):
                             num_samples=1000)
     return preds
 
+
+
+
+def dgp_predict_cov(dgpmodel,
+               x,
+               num_mc: int = 10,
+               jitter: float = 1e-8,
+               device="cuda"):
+
+    x = x.to(device)
+
+    with gpytorch.settings.fast_pred_var(), gpytorch.settings.num_likelihood_samples(num_mc):
+        post = dgpmodel.likelihood(dgpmodel(x)).to_data_independent_dist()
+        # mean : [num_mc, 1, T]
+        # cov_matrix : [num_mc, 1, T, T]
+    mean_mc = post.mean.squeeze(1)                     # [num_mc, T]
+    cov_mc  = post.covariance_matrix.squeeze(1)        # [num_mc, T, T]
+
+    # 2. Moment matching across MC dimension
+    mu_bar = mean_mc.mean(dim=0)                       # [T]
+    centered = mean_mc - mu_bar                        # [num_mc, T]
+    cov_mu   = (centered.unsqueeze(2)                  # [num_mc, T, 1]
+                @ centered.unsqueeze(1))               # [num_mc, 1, T] → [num_mc, T, T]
+
+    Sigma_bar = cov_mc.mean(dim=0) + cov_mu.mean(dim=0)  # [T, T]
+
+    Sigma_bar = Sigma_bar + jitter * torch.eye(Sigma_bar.size(0),
+                                               device=Sigma_bar.device)
+
+    return pyro.distributions.MultivariateNormal(mu_bar, covariance_matrix=Sigma_bar)
