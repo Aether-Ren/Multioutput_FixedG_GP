@@ -18,13 +18,10 @@ import GP_functions.Tools as Tools
 import GP_functions.FeatureE as FeatureE
 
 X_train = pd.read_csv('Data/X_train.csv', header=None, delimiter=',').values
-X_test = pd.read_csv('Data/X_test.csv', header=None, delimiter=',').values
+X_test = pd.read_csv('LocalDisease/X_1_1.csv', header=None, delimiter=',').values
 
 Y_train_21 = pd.read_csv('Data/Y_train_std_21.csv', header=None, delimiter=',').values
-Y_test_21 = pd.read_csv('Data/Y_test_std_21.csv', header=None, delimiter=',').values
-
-Y_train_std = pd.read_csv('Data/Y_train_std.csv', header=None, delimiter=',').values
-Y_test_std = pd.read_csv('Data/Y_test_std.csv', header=None, delimiter=',').values
+Y_test_21 = pd.read_csv('LocalDisease/Y_data_X_1_1_pca.csv', header=None, delimiter=',').values
 
 
 train_x = torch.tensor(X_train, dtype=torch.float32)
@@ -33,8 +30,6 @@ test_x = torch.tensor(X_test, dtype=torch.float32)
 train_y_21 = torch.tensor(Y_train_21, dtype=torch.float32)
 test_y_21 = torch.tensor(Y_test_21, dtype=torch.float32)
 
-train_y = torch.tensor(Y_train_std, dtype=torch.float32)
-test_y = torch.tensor(Y_test_std, dtype=torch.float32)
 
 
 torch.set_default_dtype(torch.float32)
@@ -44,8 +39,8 @@ torch.set_default_dtype(torch.float32)
 Device = 'cpu'
 
 
-output_file = 'Result/MVGP_21_result.csv'
-mcmc_dir = 'Result/MVGP_21_mcmc_result'
+output_file = 'LocalDisease/Result/MVGP_21_result.csv'
+mcmc_dir = 'LocalDisease/Result/MVGP_21_mcmc_result'
 if not os.path.exists(mcmc_dir):
     os.makedirs(mcmc_dir)
 
@@ -84,7 +79,7 @@ for row_idx in range(test_y_21.shape[0]):
 
     estimated_params_tmp, _ = Estimation.multi_start_estimation(
         MVGP_models, MVGP_likelihoods, row_idx, test_y_21, bounds,
-        Estimation.estimate_params_for_one_model_Adam, num_starts=16, num_iterations=2000, lr=0.01,
+        Estimation.estimate_params_for_one_model_Adam, num_starts=8, num_iterations=2000, lr=0.01,
         patience=10, attraction_threshold=0.1, repulsion_strength=0.1, device=Device
     )
 
