@@ -97,14 +97,14 @@ for num_latents in num_latents_candidates:
                     'num_latents': num_latents,
                     'num_inducing': num_inducing
                 }
-                best_model = MVGP_models  # 保留当下最好的模型
+                best_model = MVGP_models  # 
                 best_likelihood = MVGP_likelihoods
 
 print("=====================================")
 print(f"best paramaters: {best_params}")
 print(f"best MSE: {best_mse:.4f}")
 
-# ========== 训练结束后保存最优模型 ==========
+
 checkpoint = {
     'model_state_dict': best_model.state_dict(),
     'likelihood_state_dict': best_likelihood.state_dict(),
