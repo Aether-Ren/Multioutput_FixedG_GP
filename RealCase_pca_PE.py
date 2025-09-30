@@ -70,7 +70,7 @@ MVGP_likelihoods.load_state_dict(checkpoint['likelihood_state_dict'])
 MVGP_models.eval()
 MVGP_likelihoods.eval()
 
-for row_idx in range(realcase_y_pca.shape[0]):
+for row_idx in range(7, realcase_y_pca.shape[0]):
     input_point = realcase_y_pca[row_idx, :]
 
     local_train_x, local_train_y = Tools.find_k_nearest_neighbors_CPU(input_point, train_x, train_y_pca, k=100)
