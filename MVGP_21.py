@@ -65,7 +65,7 @@ MVGP_models.eval()
 MVGP_likelihoods.eval()
 
 
-for row_idx in range(test_y_21.shape[0]):
+for row_idx in range(1, test_y_21.shape[0]):
     input_point = test_y_21[row_idx, :]
 
     local_train_x, local_train_y = Tools.find_k_nearest_neighbors_CPU(input_point, train_x, train_y_21, k=100)
