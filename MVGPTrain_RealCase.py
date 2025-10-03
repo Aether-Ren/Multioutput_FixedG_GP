@@ -50,8 +50,8 @@ test_y = torch.tensor(Y_test_std, dtype=torch.float32)
 
 Device = 'cpu'
 
-num_latents_candidates = [24,32,36,42]
-num_inducing_candidates = [300, 400, 500]
+num_latents_candidates = [42, 48]
+num_inducing_candidates = [500]
 covar_type_candidates = ['RBF', 'RQ']
 
 n_P = train_y.shape[1]
