@@ -51,7 +51,7 @@ test_y_pca = torch.tensor(Y_test_pca, dtype=torch.float32)
 
 
 
-Device = 'cuda'
+Device = 'cpu'
 
 num_latents_candidates = [32, 36]
 num_inducing_candidates = [300, 400, 500]
