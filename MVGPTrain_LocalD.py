@@ -36,10 +36,16 @@ import GP_functions.FeatureE as FeatureE
 X_train = pd.read_csv('Data/X_train.csv', header=None, delimiter=',').values
 X_test = pd.read_csv('Data/X_test.csv', header=None, delimiter=',').values
 
+X_edge = pd.read_csv('Data/X_edge.csv', header=None, delimiter=',').values
 
 
 Y_train_pca = pd.read_csv('LocalDisease/Y_train_std_pca.csv', header=None, delimiter=',').values
 Y_test_pca = pd.read_csv('LocalDisease/Y_test_std_pca.csv', header=None, delimiter=',').values
+
+Y_edge_std_pca = pd.read_csv('LocalDisease/Y_edge_std_pca.csv', header=None, delimiter=',').values
+
+X_train = np.vstack([X_train, X_edge])
+Y_train_pca = np.vstack([Y_train_pca, Y_edge_std_pca])
 
 
 train_x = torch.tensor(X_train, dtype=torch.float32)
