@@ -23,11 +23,17 @@ X_test = pd.read_csv('LocalDisease/X_1_1.csv', header=None, delimiter=',').value
 Y_train_21 = pd.read_csv('Data/Y_train_std_21.csv', header=None, delimiter=',').values
 Y_test_21 = pd.read_csv('LocalDisease/Y_data_X_1_1_pca.csv', header=None, delimiter=',').values
 
+X_edge = pd.read_csv('Data/X_edge.csv', header=None, delimiter=',').values
+Y_edge_std_pca = pd.read_csv('LocalDisease/Y_edge_std_pca.csv', header=None, delimiter=',').values
+
+X_train = np.vstack([X_train, X_edge])
+Y_train_pca = np.vstack([Y_train_21, Y_edge_std_pca])
+
 
 train_x = torch.tensor(X_train, dtype=torch.float32)
 test_x = torch.tensor(X_test, dtype=torch.float32)
 
-train_y_21 = torch.tensor(Y_train_21, dtype=torch.float32)
+train_y_21 = torch.tensor(Y_train_pca, dtype=torch.float32)
 test_y_21 = torch.tensor(Y_test_21, dtype=torch.float32)
 
 
@@ -48,7 +54,7 @@ if not os.path.exists(output_file):
     with open(output_file, 'w') as f:
         f.write('Iteration,test_preds,estimated_params\n')
 
-checkpoint = torch.load('multitask_gp_checkpoint_21.pth', map_location=Device)
+checkpoint = torch.load('multitask_gp_checkpoint_LocalD.pth', map_location=Device)
 model_params = checkpoint['model_params']
 
 MVGP_models = GP_models.MultitaskVariationalGP(train_x, train_y_21, 
