@@ -21,7 +21,7 @@ X_train = pd.read_csv('Data/X_train.csv', header=None, delimiter=',').values
 X_test = pd.read_csv('LocalDisease/X_1_1.csv', header=None, delimiter=',').values
 
 Y_train_21 = pd.read_csv('Data/Y_train_std_21.csv', header=None, delimiter=',').values
-Y_test_21 = pd.read_csv('LocalDisease/Y_data_X_1_1_pca.csv', header=None, delimiter=',').values
+Y_test_21 = pd.read_csv('LocalDisease/Y_data_1_1_pca.csv', header=None, delimiter=',').values
 
 X_edge = pd.read_csv('Data/X_edge.csv', header=None, delimiter=',').values
 Y_edge_std_pca = pd.read_csv('LocalDisease/Y_edge_std_pca.csv', header=None, delimiter=',').values
