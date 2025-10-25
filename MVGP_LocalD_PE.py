@@ -46,9 +46,6 @@ Device = 'cpu'
 
 
 output_file = 'LocalDisease/Result/MVGP_21_result.csv'
-mcmc_dir = 'LocalDisease/Result/MVGP_21_mcmc_result'
-if not os.path.exists(mcmc_dir):
-    os.makedirs(mcmc_dir)
 
 if not os.path.exists(output_file):
     with open(output_file, 'w') as f:
@@ -93,19 +90,8 @@ for row_idx in range(test_y_21.shape[0]):
         # f.write(f"{row_idx + 1},\"{list(preds_tmp)}\",\"{list(estimated_params_tmp.detach().numpy())}\"\n")
         f.write(f"{row_idx + 1},\"{list(preds_tmp)}\",\"{list(estimated_params_tmp)}\"\n")
 
-    mcmc_result_Uniform = Estimation.run_mcmc_Uniform(
-        Prediction.preds_distribution, MVGP_models, MVGP_likelihoods, 
-        row_idx, test_y_21, bounds, 
-        num_sampling=1200, warmup_step=300, num_chains=1, device=Device
-    )
-    posterior_samples_Uniform = mcmc_result_Uniform.get_samples()
-
-
-    mcmc_file = os.path.join(mcmc_dir, f'result_{row_idx + 1}.pkl')
-    with open(mcmc_file, 'wb') as f:
-        pickle.dump(posterior_samples_Uniform, f)
 
 
 
 
-# nohup python MVGP_21.py > MVGP_21out.log 2>&1 &
+# nohup python MVGP_LocalD_PE.py > MVGP_LocalD_PEout.log 2>&1 &
