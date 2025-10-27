@@ -42,10 +42,10 @@ torch.set_default_dtype(torch.float32)
 
 ####################################################################
 
-Device = 'cpu'
+Device = 'cuda'
 
 
-output_file = 'LocalDisease/Result/MVGP_21_result.csv'
+output_file = 'LocalDisease/Result/MVGP_X_1_1_result.csv'
 
 if not os.path.exists(output_file):
     with open(output_file, 'w') as f:
@@ -71,7 +71,8 @@ MVGP_likelihoods.eval()
 for row_idx in range(test_y_21.shape[0]):
     input_point = test_y_21[row_idx, :]
 
-    local_train_x, local_train_y = Tools.find_k_nearest_neighbors_CPU(input_point, train_x, train_y_21, k=100)
+    # local_train_x, local_train_y = Tools.find_k_nearest_neighbors_CPU(input_point, train_x, train_y_21, k=100)
+    local_train_x, local_train_y = Tools.find_k_nearest_neighbors_GPU(input_point, train_x, train_y_21, k=100)
 
     preds_tmp = Prediction.preds_for_one_model(
         MVGP_models, MVGP_likelihoods, test_x[row_idx,:].unsqueeze(0).to(Device)
