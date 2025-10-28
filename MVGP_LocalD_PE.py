@@ -18,10 +18,10 @@ import GP_functions.Tools as Tools
 import GP_functions.FeatureE as FeatureE
 
 X_train = pd.read_csv('Data/X_train.csv', header=None, delimiter=',').values
-X_test = pd.read_csv('LocalDisease/X_1_5.csv', header=None, delimiter=',').values
+X_test = pd.read_csv('LocalDisease/X_2.csv', header=None, delimiter=',').values
 
 Y_train_21 = pd.read_csv('Data/Y_train_std_21.csv', header=None, delimiter=',').values
-Y_test_21 = pd.read_csv('LocalDisease/Y_data_1_5_pca.csv', header=None, delimiter=',').values
+Y_test_21 = pd.read_csv('LocalDisease/Y_data_2_pca.csv', header=None, delimiter=',').values
 
 X_edge = pd.read_csv('Data/X_edge.csv', header=None, delimiter=',').values
 Y_edge_std_pca = pd.read_csv('LocalDisease/Y_edge_std_pca.csv', header=None, delimiter=',').values
@@ -45,7 +45,7 @@ torch.set_default_dtype(torch.float32)
 Device = 'cuda'
 
 
-output_file = 'LocalDisease/Result/MVGP_X_1_5_result.csv'
+output_file = 'LocalDisease/Result/MVGP_X_2_result.csv'
 
 if not os.path.exists(output_file):
     with open(output_file, 'w') as f:
