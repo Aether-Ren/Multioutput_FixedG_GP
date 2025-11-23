@@ -51,7 +51,7 @@ if not os.path.exists(output_file):
     with open(output_file, 'w') as f:
         f.write('Iteration,test_preds,estimated_params\n')
 
-checkpoint = torch.load('multitask_gp_checkpoint_LocalD.pth', map_location=Device)
+checkpoint = torch.load('multitask_gp_checkpoint_21.pth', map_location=Device)
 model_params = checkpoint['model_params']
 
 MVGP_models = GP_models.MultitaskVariationalGP(train_x, train_y_21, 
