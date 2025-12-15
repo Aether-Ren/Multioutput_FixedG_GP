@@ -1,0 +1,172 @@
+import torch
+import gpytorch
+import pandas as pd
+import numpy as np
+import tqdm as tqdm
+from linear_operator import settings
+
+import pyro
+import math
+import pickle
+import time
+from joblib import Parallel, delayed
+
+from sklearn.preprocessing import StandardScaler
+
+from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
+
+import pyro.distributions as dist
+from pyro.infer import MCMC, NUTS
+import arviz as az
+import seaborn as sns
+
+import os
+
+import GP_functions.Loss_function as Loss_function
+import GP_functions.bound as bound
+import GP_functions.Estimation as Estimation
+import GP_functions.Training as Training
+import GP_functions.Prediction as Prediction
+import GP_functions.GP_models as GP_models
+import GP_functions.Tools as Tools
+import GP_functions.FeatureE as FeatureE
+
+
+X_train = pd.read_csv('RealCase/RealCase_X_train.csv', header=None, delimiter=',').values
+X_test = pd.read_csv('RealCase/RealCase_X_test.csv', header=None, delimiter=',').values
+
+Realcase_data = pd.read_csv('RealCase/RealCase_Y_std.csv', header=None, delimiter=',').values
+
+Y_train_std = pd.read_csv('RealCase/RealCase_Y_train_std.csv', header=None, delimiter=',').values
+Y_test_std = pd.read_csv('RealCase/RealCase_Y_test_std.csv', header=None, delimiter=',').values
+
+train_x = torch.tensor(X_train, dtype=torch.float32)
+test_x = torch.tensor(X_test, dtype=torch.float32)
+
+
+train_y = torch.tensor(Y_train_std, dtype=torch.float32)
+test_y = torch.tensor(Y_test_std, dtype=torch.float32)
+
+realcase_y = torch.tensor(Realcase_data, dtype=torch.float32)
+
+
+# Device = 'cpu'
+Device = 'cuda'
+
+num_latents_candidates = [42]
+num_inducing_candidates = [500]
+covar_type_candidates = ['RQ']
+
+n_P = train_y.shape[1]
+
+best_mse = float('inf')
+best_params = None
+best_model = None
+best_likelihood = None
+
+for num_latents in num_latents_candidates:
+    for num_inducing in num_inducing_candidates:
+        for covar_type in covar_type_candidates:
+            MVGP_models, MVGP_likelihoods = Training.train_MultitaskVGP_minibatch(
+                train_x=train_x.to(Device),
+                train_y=train_y.to(Device),
+                covar_type=covar_type,
+                num_latents=num_latents,
+                num_inducing=num_inducing,
+                lr_hyper=0.01,
+                lr_variational=0.1,
+                num_iterations=10000,
+                patience=10,
+                device=Device,
+                batch_size=512,
+                eval_every=100,
+                eval_batch_size=1024
+            )
+            
+            full_test_preds_MVGP = Prediction.preds_for_one_model(
+                MVGP_models,
+                MVGP_likelihoods,
+                test_x.to(Device)
+            ).cpu().detach().numpy()
+            
+            mse = np.mean((full_test_preds_MVGP.reshape(-1, n_P) - test_y.numpy()) ** 2)
+            print(f"Done: covar_type={covar_type}, num_latents={num_latents}, "
+                  f"num_inducing={num_inducing}, MSE={mse:.4f}")
+            
+            if mse < best_mse:
+                best_mse = mse
+                best_params = {
+                    'covar_type': covar_type,
+                    'num_latents': num_latents,
+                    'num_inducing': num_inducing
+                }
+                best_model = MVGP_models  # 
+                best_likelihood = MVGP_likelihoods
+
+print("=====================================")
+print(f"best paramaters: {best_params}")
+print(f"best MSE: {best_mse:.4f}")
+
+
+checkpoint = {
+    'model_state_dict': best_model.state_dict(),
+    'likelihood_state_dict': best_likelihood.state_dict(),
+    'model_params': {
+        'num_latents': best_params['num_latents'],
+        'num_inducing': best_params['num_inducing'],
+        'covar_type': best_params['covar_type'],
+        'input_dim': train_x.size(1),
+        'num_tasks': train_y.size(1)
+    }
+}
+
+torch.save(checkpoint, 'multitask_gp_checkpoint_Realcase.pth')
+print("save 'multitask_gp_checkpoint_Realcase.pth'。")
+
+
+
+output_file = 'RealCase/Result/MVGP_21_result.csv'
+mcmc_dir = 'RealCase/Result/MVGP_21_mcmc_result'
+if not os.path.exists(mcmc_dir):
+    os.makedirs(mcmc_dir)
+
+if not os.path.exists(output_file):
+    with open(output_file, 'w') as f:
+        f.write('Iteration,estimated_params\n')
+
+row_idx = 0
+
+input_point = realcase_y
+
+local_train_x, local_train_y = Tools.find_k_nearest_neighbors_GPU(input_point, train_x, train_y, k=300)
+
+bounds = bound.get_bounds(local_train_x)
+
+
+estimated_params_tmp, _ = Estimation.multi_start_estimation(
+    MVGP_models, MVGP_likelihoods, row_idx, realcase_y, bounds,
+    Estimation.estimate_params_for_one_model_Adam, num_starts=16, num_iterations=2000, lr=0.01,
+    patience=10, attraction_threshold=0.1, repulsion_strength=0.1, device=Device
+)
+
+
+with open(output_file, 'a') as f:
+    # f.write(f"{row_idx + 1},\"{list(preds_tmp)}\",\"{list(estimated_params_tmp.detach().numpy())}\"\n")
+    f.write(f"{row_idx + 1},\"{list(estimated_params_tmp)}\"\n")
+
+mcmc_result_Uniform = Estimation.run_mcmc_Uniform(
+    Prediction.preds_distribution, MVGP_models, MVGP_likelihoods, 
+    row_idx, realcase_y, bounds, 
+    num_sampling=1200, warmup_step=300, num_chains=1, device=Device
+)
+posterior_samples_Uniform = mcmc_result_Uniform.get_samples()
+
+
+mcmc_file = os.path.join(mcmc_dir, f'result_{row_idx + 1}.pkl')
+with open(mcmc_file, 'wb') as f:
+    pickle.dump(posterior_samples_Uniform, f)
+
+
+
+# nohup python MVGP_RealCase_test.py > MVGP_RealCase_testout.log 2>&1 &
