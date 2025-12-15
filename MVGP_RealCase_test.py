@@ -51,8 +51,8 @@ test_y = torch.tensor(Y_test_std, dtype=torch.float32)
 realcase_y = torch.tensor(Realcase_data, dtype=torch.float32)
 
 
-# Device = 'cpu'
-Device = 'cuda'
+Device = 'cpu'
+# Device = 'cuda'
 
 num_latents_candidates = [42]
 num_inducing_candidates = [500]
