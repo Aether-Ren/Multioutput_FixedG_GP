@@ -51,13 +51,13 @@ test_y = torch.tensor(Y_test_std, dtype=torch.float32)
 # Device = 'cpu'
 Device = 'cuda'
 
-# num_latents_candidates = [32, 36]
-# num_inducing_candidates = [300, 400, 500]
-# covar_type_candidates = ['RBF', 'RQ']
+num_latents_candidates = [32, 24]
+num_inducing_candidates = [400, 500]
+covar_type_candidates = ['RBF', 'RQ']
 
-num_latents_candidates = [32]
-num_inducing_candidates = [400]
-covar_type_candidates = ['RQ']
+# num_latents_candidates = [24, 32]
+# num_inducing_candidates = [400, 500]
+# covar_type_candidates = ['RQ']
 
 
 n_P = train_y.shape[1]
