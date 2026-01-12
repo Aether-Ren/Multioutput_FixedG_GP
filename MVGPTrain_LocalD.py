@@ -37,7 +37,7 @@ X_train = pd.read_csv('Data/Data20260110/X_train_Final_10.csv', header=None, del
 X_test = pd.read_csv('Data/Data20260110/X_test.csv', header=None, delimiter=',').values
 
 
-Y_train_pca = pd.read_csv('Data/Data20260110/Y_train_std_pca.csv', header=None, delimiter=',').values
+Y_train_pca = pd.read_csv('Data/Data20260110/Y_data_train_pca.csv', header=None, delimiter=',').values
 Y_test_pca = pd.read_csv('Data/Data20260110/Y_data_test_pca.csv', header=None, delimiter=',').values
 
 
@@ -52,13 +52,13 @@ test_y_pca = torch.tensor(Y_test_pca, dtype=torch.float32)
 
 Device = 'cuda'
 
-# num_latents_candidates = [24, 32]
-# num_inducing_candidates = [300, 400, 500]
-# covar_type_candidates = ['RBF', 'RQ']
+num_latents_candidates = [24, 32]
+num_inducing_candidates = [300, 400, 500]
+covar_type_candidates = ['RBF', 'RQ']
 
-num_latents_candidates = [32]
-num_inducing_candidates = [500]
-covar_type_candidates = ['RQ']
+# num_latents_candidates = [32]
+# num_inducing_candidates = [500]
+# covar_type_candidates = ['RQ']
 
 
 best_mse = float('inf')
@@ -77,7 +77,7 @@ for num_latents in num_latents_candidates:
                 num_inducing=num_inducing,
                 lr_hyper=0.01,
                 lr_variational=0.1,
-                num_iterations=10000,
+                num_iterations=20000,
                 patience=10,
                 device=Device,
                 batch_size=512,

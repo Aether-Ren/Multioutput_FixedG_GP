@@ -17,17 +17,13 @@ import GP_functions.GP_models as GP_models
 import GP_functions.Tools as Tools
 import GP_functions.FeatureE as FeatureE
 
-X_train = pd.read_csv('Data/X_train.csv', header=None, delimiter=',').values
-X_test = pd.read_csv('LocalDisease/X_1_1.csv', header=None, delimiter=',').values
+X_train = pd.read_csv('Data/Data20260110/X_train_Final_10.csv', header=None, delimiter=',').values
+X_test = pd.read_csv('LocalDisease/X_MI_1_5.csv', header=None, delimiter=',').values
 
-Y_train_pca = pd.read_csv('Data/Y_train_std_21.csv', header=None, delimiter=',').values
-Y_test_21 = pd.read_csv('LocalDisease/Y_data_1_1_pca.csv', header=None, delimiter=',').values
+Y_train_pca = pd.read_csv('Data/Data20260110/Y_data_train_pca.csv', header=None, delimiter=',').values
+Y_test_21 = pd.read_csv('LocalDisease/Y_data_MI_1_pca.csv', header=None, delimiter=',').values
 
-# X_edge = pd.read_csv('Data/X_edge.csv', header=None, delimiter=',').values
-# Y_edge_std_pca = pd.read_csv('LocalDisease/Y_edge_std_pca.csv', header=None, delimiter=',').values
 
-# X_train = np.vstack([X_train, X_edge])
-# Y_train_pca = np.vstack([Y_train_pca, Y_edge_std_pca])
 
 
 train_x = torch.tensor(X_train, dtype=torch.float32)
@@ -45,7 +41,7 @@ torch.set_default_dtype(torch.float32)
 Device = 'cuda'
 
 
-output_file = 'LocalDisease/Result/MVGP_X_1_1_result.csv'
+output_file = 'LocalDisease/Result/MVGP_MI_1_result.csv'
 
 if not os.path.exists(output_file):
     with open(output_file, 'w') as f:
