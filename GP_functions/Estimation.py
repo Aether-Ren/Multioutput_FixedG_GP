@@ -28,29 +28,37 @@ import arviz as az
 #############################################################################
 
 
+import torch
+from tqdm.auto import tqdm
 
-
-def estimate_params_for_one_model_Adam(model, likelihood, row_idx, test_y, initial_guess, param_ranges, num_iterations=1000, lr=0.05, patience=50, attraction_threshold=0.1, repulsion_strength=0.5, device='cpu'):
-    
+def estimate_params_for_one_model_Adam(
+    model, likelihood, row_idx, test_y, initial_guess, param_ranges,
+    num_iterations=1000, lr=0.05, patience=50,
+    attraction_threshold=0.1, repulsion_strength=0.5,
+    device='cpu',
+    show_progress: bool = False,
+    progress_desc: str = "Adam"
+):
     target_y = test_y[row_idx].to(device)
     target_x = torch.tensor(initial_guess, dtype=torch.float32).to(device).unsqueeze(0).requires_grad_(True)
-    
+
     optimizer = torch.optim.Adam([target_x], lr=lr)
-    
+
     model.eval()
     likelihood.eval()
 
     best_loss = float('inf')
+    best_state = target_x.detach().clone()
     counter = 0
-    # iterator = tqdm.tqdm(range(num_iterations))
 
-    # for i in iterator:
-    for i in range(num_iterations):
+    it = range(num_iterations)
+    it = tqdm(it, disable=not show_progress, desc=progress_desc, leave=False)
+
+    for i in it:
         optimizer.zero_grad()
-        
+
         loss = torch.norm(likelihood.to(device)(model.to(device)(target_x)).mean - target_y, p=2).sum()
         loss.backward(retain_graph=True)
-        # iterator.set_postfix(loss=loss.item())
         optimizer.step()
 
         grad_norm = target_x.grad.data.norm(2).item()
@@ -62,18 +70,115 @@ def estimate_params_for_one_model_Adam(model, likelihood, row_idx, test_y, initi
             for idx, (min_val, max_val) in enumerate(param_ranges):
                 target_x[0, idx] = target_x[0, idx].clamp(min_val, max_val)
 
-        if loss.item() < best_loss:
-            best_loss = loss.item()
+        loss_val = loss.item()
+        if loss_val < best_loss:
+            best_loss = loss_val
             best_state = target_x.detach().clone()
             counter = 0
         else:
             counter += 1
             if counter >= patience:
-                # print("Stopping early due to lack of improvement.")
                 target_x = best_state
+                if show_progress:
+                    it.set_postfix(loss=f"{loss_val:.4g}", best=f"{best_loss:.4g}", early_stop=f"iter {i}")
                 break
-    
+
+        if show_progress:
+            it.set_postfix(loss=f"{loss_val:.4g}", best=f"{best_loss:.4g}", bad=counter, grad=f"{grad_norm:.3g}")
+
     return target_x.squeeze(), best_loss
+
+
+def multi_start_estimation(
+    model, likelihood, row_idx, test_y, param_ranges, estimate_function,
+    num_starts=5, num_iterations=1000, lr=0.05, patience=50,
+    attraction_threshold=0.1, repulsion_strength=0.1,
+    device='cpu',
+    show_progress: bool = False,
+    progress_desc: str = "Multi-start"
+):
+    best_overall_loss = float('inf')
+    best_overall_state = None
+
+    dim = len(param_ranges)
+    sobol = torch.quasirandom.SobolEngine(dim, scramble=False)
+    sobol_samples = sobol.draw(num_starts)  # [num_starts, dim]
+
+    outer = range(num_starts)
+    outer = tqdm(outer, disable=not show_progress, desc=progress_desc, leave=True)
+
+    for start in outer:
+        sample = sobol_samples[start]
+        initial_guess = [
+            min_val + s.item() * (max_val - min_val)
+            for s, (min_val, max_val) in zip(sample, param_ranges)
+        ]
+
+        estimated_params, loss = estimate_function(
+            model, likelihood, row_idx, test_y, initial_guess, param_ranges,
+            num_iterations=num_iterations, lr=lr, patience=patience,
+            attraction_threshold=attraction_threshold, repulsion_strength=repulsion_strength,
+            device=device,
+            show_progress=show_progress,                   # 关键：把开关传下去
+            progress_desc=f"Start {start+1}/{num_starts}"  # 每次 start 的内层进度条标题
+        )
+
+        if loss < best_overall_loss:
+            best_overall_loss = loss
+            best_overall_state = estimated_params
+
+        if show_progress:
+            outer.set_postfix(last=f"{loss:.4g}", best=f"{best_overall_loss:.4g}")
+
+    return best_overall_state.cpu().detach().numpy(), best_overall_loss
+
+
+
+
+# def estimate_params_for_one_model_Adam(model, likelihood, row_idx, test_y, initial_guess, param_ranges, num_iterations=1000, lr=0.05, patience=50, attraction_threshold=0.1, repulsion_strength=0.5, device='cpu'):
+    
+#     target_y = test_y[row_idx].to(device)
+#     target_x = torch.tensor(initial_guess, dtype=torch.float32).to(device).unsqueeze(0).requires_grad_(True)
+    
+#     optimizer = torch.optim.Adam([target_x], lr=lr)
+    
+#     model.eval()
+#     likelihood.eval()
+
+#     best_loss = float('inf')
+#     counter = 0
+#     # iterator = tqdm.tqdm(range(num_iterations))
+
+#     # for i in iterator:
+#     for i in range(num_iterations):
+#         optimizer.zero_grad()
+        
+#         loss = torch.norm(likelihood.to(device)(model.to(device)(target_x)).mean - target_y, p=2).sum()
+#         loss.backward(retain_graph=True)
+#         # iterator.set_postfix(loss=loss.item())
+#         optimizer.step()
+
+#         grad_norm = target_x.grad.data.norm(2).item()
+#         if grad_norm < attraction_threshold:
+#             target_x.grad.data += repulsion_strength * torch.randn_like(target_x.grad.data)
+#             optimizer.step()
+
+#         with torch.no_grad():
+#             for idx, (min_val, max_val) in enumerate(param_ranges):
+#                 target_x[0, idx] = target_x[0, idx].clamp(min_val, max_val)
+
+#         if loss.item() < best_loss:
+#             best_loss = loss.item()
+#             best_state = target_x.detach().clone()
+#             counter = 0
+#         else:
+#             counter += 1
+#             if counter >= patience:
+#                 # print("Stopping early due to lack of improvement.")
+#                 target_x = best_state
+#                 break
+    
+#     return target_x.squeeze(), best_loss
 
 
 
@@ -210,38 +315,38 @@ def estimate_params_Adam_VGP(Models, Likelihoods, row_idx, test_y, initial_guess
 
 
 
-def multi_start_estimation(model, likelihood, row_idx, test_y, param_ranges, estimate_function, num_starts=5, num_iterations=1000, lr=0.05, patience=50, attraction_threshold=0.1, repulsion_strength=0.1, device='cpu'):
-    best_overall_loss = float('inf')
-    best_overall_state = None
+# def multi_start_estimation(model, likelihood, row_idx, test_y, param_ranges, estimate_function, num_starts=5, num_iterations=1000, lr=0.05, patience=50, attraction_threshold=0.1, repulsion_strength=0.1, device='cpu'):
+#     best_overall_loss = float('inf')
+#     best_overall_state = None
 
-    dim = len(param_ranges)
-    sobol = torch.quasirandom.SobolEngine(dim, scramble=False)
-    sobol_samples = sobol.draw(num_starts)  # shape: [num_starts, dim]
+#     dim = len(param_ranges)
+#     sobol = torch.quasirandom.SobolEngine(dim, scramble=False)
+#     sobol_samples = sobol.draw(num_starts)  # shape: [num_starts, dim]
 
-    for start in range(num_starts):
-        sample = sobol_samples[start]
+#     for start in range(num_starts):
+#         sample = sobol_samples[start]
 
-        initial_guess = [
-            min_val + s.item() * (max_val - min_val)
-            for s, (min_val, max_val) in zip(sample, param_ranges)
-        ]
+#         initial_guess = [
+#             min_val + s.item() * (max_val - min_val)
+#             for s, (min_val, max_val) in zip(sample, param_ranges)
+#         ]
 
-        # initial_guess = []
-        # for i, (min_val, max_val) in enumerate(param_ranges):
-        #     guess = min_val + sample[i].item() * (max_val - min_val)
-        #     initial_guess.append(guess)
+#         # initial_guess = []
+#         # for i, (min_val, max_val) in enumerate(param_ranges):
+#         #     guess = min_val + sample[i].item() * (max_val - min_val)
+#         #     initial_guess.append(guess)
 
-        estimated_params, loss = estimate_function(
-            model, likelihood, row_idx, test_y, initial_guess, param_ranges,
-            num_iterations=num_iterations, lr=lr, patience=patience,
-            attraction_threshold=attraction_threshold, repulsion_strength=repulsion_strength, device=device
-        )
+#         estimated_params, loss = estimate_function(
+#             model, likelihood, row_idx, test_y, initial_guess, param_ranges,
+#             num_iterations=num_iterations, lr=lr, patience=patience,
+#             attraction_threshold=attraction_threshold, repulsion_strength=repulsion_strength, device=device
+#         )
 
-        if loss < best_overall_loss:
-            best_overall_loss = loss
-            best_overall_state = estimated_params
+#         if loss < best_overall_loss:
+#             best_overall_loss = loss
+#             best_overall_state = estimated_params
 
-    return best_overall_state.cpu().detach().numpy(), best_overall_loss
+#     return best_overall_state.cpu().detach().numpy(), best_overall_loss
 
 
 

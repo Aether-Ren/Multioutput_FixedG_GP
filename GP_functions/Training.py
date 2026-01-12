@@ -28,6 +28,7 @@ from pyro.infer import SVI, Trace_ELBO, Predictive
 from pyro.infer.autoguide import AutoDiagonalNormal
 from pyro.optim import ClippedAdam
 
+import copy
 
 #############################################################################
 ## Training LocalGP
@@ -302,89 +303,208 @@ def evaluate_full_dataset_loss(model, likelihood, mll, train_x, train_y, batch_s
     likelihood.train()
     return avg_loss
 
-def train_MultitaskVGP_minibatch(train_x, train_y, covar_type='Matern3/2', num_latents=20, num_inducing=100, 
-                           lr_hyper=0.01, lr_variational=0.1, num_iterations=1000, patience=10, 
-                           device='cpu', batch_size=256, eval_every=100, eval_batch_size=1024):
+# def train_MultitaskVGP_minibatch(train_x, train_y, covar_type='Matern3/2', num_latents=20, num_inducing=100, 
+#                            lr_hyper=0.01, lr_variational=0.1, num_iterations=1000, patience=10, 
+#                            device='cpu', batch_size=256, eval_every=100, eval_batch_size=1024):
 
 
-    train_x = train_x.to(device)
-    train_y = train_y.to(device)
+#     train_x = train_x.to(device)
+#     train_y = train_y.to(device)
+
+#     model = GP_models.MultitaskVariationalGP(
+#         train_x, train_y, 
+#         num_latents=num_latents, 
+#         num_inducing=num_inducing, 
+#         covar_type=covar_type
+#     ).to(device)
+    
+#     likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(
+#         num_tasks=train_y.shape[1]
+#     ).to(device)
+
+#     variational_ngd_optimizer = gpytorch.optim.NGD(
+#         model.variational_parameters(),
+#         num_data=train_y.size(0),
+#         lr=lr_variational
+#     )
+    
+#     hyperparameter_optimizer = torch.optim.Adam([
+#         {'params': model.hyperparameters()},
+#         {'params': likelihood.parameters()}
+#     ], lr=lr_hyper)
+
+#     mll = gpytorch.mlls.VariationalELBO(likelihood, model, num_data=train_y.size(0))
+
+
+#     best_loss = float('inf')
+#     counter = 0
+#     best_state = model.state_dict()
+#     data_loader = DataLoader(
+#         TensorDataset(train_x, train_y),
+#         batch_size=batch_size,
+#         shuffle=True
+#     )
+#     minibatch_iter = itertools.cycle(data_loader)
+
+#     with tqdm.tqdm(total=num_iterations, desc="Training") as pbar:
+#         for step in range(num_iterations):
+
+#             x_batch, y_batch = next(minibatch_iter)
+#             x_batch, y_batch = x_batch.to(device), y_batch.to(device)
+
+#             variational_ngd_optimizer.zero_grad()
+#             output = model(x_batch)
+#             loss = -mll(output, y_batch)
+#             loss.backward()
+#             variational_ngd_optimizer.step()
+
+#             hyperparameter_optimizer.zero_grad()
+#             output = model(x_batch)
+#             loss = -mll(output, y_batch)
+#             loss.backward()
+#             hyperparameter_optimizer.step()
+
+#             if (step + 1) % eval_every == 0 or step == num_iterations - 1:
+#                 current_loss = evaluate_full_dataset_loss(
+#                     model, likelihood, mll,
+#                     train_x, train_y,
+#                     batch_size=eval_batch_size,
+#                     device=device
+#                 )
+                
+#                 pbar.set_postfix(full_loss=current_loss)
+                
+#                 if current_loss < best_loss:
+#                     best_loss = current_loss
+#                     best_state = model.state_dict()
+#                     counter = 0
+#                 else:
+#                     counter += 1
+#                     if counter >= patience:
+#                         model.load_state_dict(best_state)
+#                         pbar.update(num_iterations - step - 1)
+#                         break
+
+#             pbar.update(1)
+
+#     return model, likelihood
+
+
+
+
+
+
+import copy
+import math
+import torch
+import gpytorch
+import tqdm
+
+def train_MultitaskVGP_minibatch(
+    train_x, train_y,
+    covar_type='Matern3/2',
+    num_latents=20, num_inducing=100,
+    lr_hyper=0.01, lr_variational=0.1,
+    num_iterations=1000, patience=10,
+    device='cuda',
+    batch_size=256,
+    eval_every=100,
+    eval_batch_size=1024
+):
+    train_x = train_x.to(device, non_blocking=True).contiguous()
+    train_y = train_y.to(device, non_blocking=True).contiguous()
+    N = train_y.size(0)
 
     model = GP_models.MultitaskVariationalGP(
-        train_x, train_y, 
-        num_latents=num_latents, 
-        num_inducing=num_inducing, 
+        train_x, train_y,
+        num_latents=num_latents,
+        num_inducing=num_inducing,
         covar_type=covar_type
     ).to(device)
-    
+
     likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(
         num_tasks=train_y.shape[1]
     ).to(device)
 
     variational_ngd_optimizer = gpytorch.optim.NGD(
         model.variational_parameters(),
-        num_data=train_y.size(0),
+        num_data=N,
         lr=lr_variational
     )
-    
+
     hyperparameter_optimizer = torch.optim.Adam([
         {'params': model.hyperparameters()},
-        {'params': likelihood.parameters()}
+        {'params': likelihood.parameters()},
     ], lr=lr_hyper)
 
-    mll = gpytorch.mlls.VariationalELBO(likelihood, model, num_data=train_y.size(0))
+    mll = gpytorch.mlls.VariationalELBO(likelihood, model, num_data=N)
 
+    model.train()
+    likelihood.train()
 
     best_loss = float('inf')
     counter = 0
-    best_state = model.state_dict()
-    data_loader = DataLoader(
-        TensorDataset(train_x, train_y),
-        batch_size=batch_size,
-        shuffle=True
-    )
-    minibatch_iter = itertools.cycle(data_loader)
+    best_state = copy.deepcopy(model.state_dict())
+
+    steps_per_epoch = math.ceil(N / batch_size)
+    step = 0
 
     with tqdm.tqdm(total=num_iterations, desc="Training") as pbar:
-        for step in range(num_iterations):
+        epoch = 0
+        while step < num_iterations:
+            epoch += 1
 
-            x_batch, y_batch = next(minibatch_iter)
-            x_batch, y_batch = x_batch.to(device), y_batch.to(device)
+            perm = torch.randperm(N, device=device)
 
-            variational_ngd_optimizer.zero_grad()
-            output = model(x_batch)
-            loss = -mll(output, y_batch)
-            loss.backward()
-            variational_ngd_optimizer.step()
+            for b in range(steps_per_epoch):
+                if step >= num_iterations:
+                    break
 
-            hyperparameter_optimizer.zero_grad()
-            output = model(x_batch)
-            loss = -mll(output, y_batch)
-            loss.backward()
-            hyperparameter_optimizer.step()
+                s = b * batch_size
+                e = min((b + 1) * batch_size, N)
+                idx = perm[s:e]
 
-            if (step + 1) % eval_every == 0 or step == num_iterations - 1:
-                current_loss = evaluate_full_dataset_loss(
-                    model, likelihood, mll,
-                    train_x, train_y,
-                    batch_size=eval_batch_size,
-                    device=device
-                )
-                
-                pbar.set_postfix(full_loss=current_loss)
-                
-                if current_loss < best_loss:
-                    best_loss = current_loss
-                    best_state = model.state_dict()
-                    counter = 0
-                else:
-                    counter += 1
-                    if counter >= patience:
-                        model.load_state_dict(best_state)
-                        pbar.update(num_iterations - step - 1)
-                        break
+                x_batch = train_x.index_select(0, idx)
+                y_batch = train_y.index_select(0, idx)
 
-            pbar.update(1)
+                # NGD: variational params
+                variational_ngd_optimizer.zero_grad(set_to_none=True)
+                output = model(x_batch)
+                loss = -mll(output, y_batch)
+                loss.backward()
+                variational_ngd_optimizer.step()
+
+                # Adam: hyper + likelihood params
+                hyperparameter_optimizer.zero_grad(set_to_none=True)
+                output = model(x_batch)
+                loss = -mll(output, y_batch)
+                loss.backward()
+                hyperparameter_optimizer.step()
+
+                # eval + early stopping 
+                if (step + 1) % eval_every == 0 or step == num_iterations - 1:
+                    current_loss = evaluate_full_dataset_loss(
+                        model, likelihood, mll,
+                        train_x, train_y,
+                        batch_size=eval_batch_size,
+                        device=device
+                    )
+                    pbar.set_postfix(full_loss=float(current_loss))
+
+                    if current_loss < best_loss:
+                        best_loss = current_loss
+                        best_state = copy.deepcopy(model.state_dict())
+                        counter = 0
+                    else:
+                        counter += 1
+                        if counter >= patience:
+                            model.load_state_dict(best_state)
+                            pbar.update(num_iterations - step - 1)
+                            step = num_iterations
+                            break
+
+                step += 1
+                pbar.update(1)
 
     return model, likelihood
 

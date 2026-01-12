@@ -33,19 +33,12 @@ import GP_functions.Tools as Tools
 import GP_functions.FeatureE as FeatureE
 
 
-X_train = pd.read_csv('Data/X_train.csv', header=None, delimiter=',').values
-X_test = pd.read_csv('Data/X_test.csv', header=None, delimiter=',').values
-
-X_edge = pd.read_csv('Data/X_edge.csv', header=None, delimiter=',').values
+X_train = pd.read_csv('Data/Data20260110/X_train_Final_10.csv', header=None, delimiter=',').values
+X_test = pd.read_csv('Data/Data20260110/X_test.csv', header=None, delimiter=',').values
 
 
-Y_train_pca = pd.read_csv('LocalDisease/Y_train_std_pca.csv', header=None, delimiter=',').values
-Y_test_pca = pd.read_csv('LocalDisease/Y_test_std_pca.csv', header=None, delimiter=',').values
-
-Y_edge_std_pca = pd.read_csv('LocalDisease/Y_edge_std_pca.csv', header=None, delimiter=',').values
-
-X_train = np.vstack([X_train, X_edge])
-Y_train_pca = np.vstack([Y_train_pca, Y_edge_std_pca])
+Y_train_pca = pd.read_csv('Data/Data20260110/Y_train_std_pca.csv', header=None, delimiter=',').values
+Y_test_pca = pd.read_csv('Data/Data20260110/Y_data_test_pca.csv', header=None, delimiter=',').values
 
 
 train_x = torch.tensor(X_train, dtype=torch.float32)
@@ -59,9 +52,14 @@ test_y_pca = torch.tensor(Y_test_pca, dtype=torch.float32)
 
 Device = 'cuda'
 
-num_latents_candidates = [24, 32]
-num_inducing_candidates = [300, 400, 500]
-covar_type_candidates = ['RBF', 'RQ']
+# num_latents_candidates = [24, 32]
+# num_inducing_candidates = [300, 400, 500]
+# covar_type_candidates = ['RBF', 'RQ']
+
+num_latents_candidates = [32]
+num_inducing_candidates = [500]
+covar_type_candidates = ['RQ']
+
 
 best_mse = float('inf')
 best_params = None
