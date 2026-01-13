@@ -613,13 +613,75 @@ def train_one_row_MultitaskGP_lcm(local_train_x, local_train_y, n_tasks, lr=0.05
 
 
 
-def train_one_row_NNMultitaskGP(local_train_x, local_train_y, n_tasks, feature_extractor_class, covar_type = 'RBF', lr=0.05, num_iterations=5000, patience=10, device='cuda'):
+# def train_one_row_NNMultitaskGP(local_train_x, local_train_y, n_tasks, feature_extractor_class, covar_type = 'RBF', lr=0.05, num_iterations=5000, patience=10, device='cuda'):
 
+#     local_train_x = local_train_x.to(device)
+#     local_train_y = local_train_y.to(device)
+
+#     likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(num_tasks=n_tasks)
+#     model = GP_models.NNMultitaskGP(local_train_x, local_train_y, likelihood, n_tasks, feature_extractor_class, covar_type)
+
+#     model = model.to(device)
+#     likelihood = likelihood.to(device)
+
+#     model.train()
+#     likelihood.train()
+
+#     optimizer = torch.optim.Adam([
+#         {'params': model.feature_extractor.parameters()},
+#         {'params': model.covar_module.parameters()},
+#         {'params': model.mean_module.parameters()},
+#         {'params': likelihood.parameters()},
+#     ], lr=lr)
+
+#     mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
+    
+#     best_loss = float('inf')
+#     counter = 0
+
+#     # iterator = tqdm.tqdm(range(num_iterations))
+#     # for i in iterator:
+#     for i in range(num_iterations):
+#         optimizer.zero_grad()
+#         output = model(local_train_x)
+#         loss = -mll(output, local_train_y)
+#         loss.backward()
+#         # iterator.set_postfix(loss=loss.item())
+#         optimizer.step()
+
+#         if loss <= best_loss:
+#             best_loss = loss
+#             best_state = model.state_dict()  
+#             counter = 0
+#         else:
+#             counter += 1
+#             if counter >= patience:
+#                 model.load_state_dict(best_state)  
+#                 break
+
+#     return model, likelihood
+
+
+
+def train_one_row_NNMultitaskGP(
+    local_train_x, local_train_y, n_tasks,
+    feature_extractor_class,
+    covar_type='RBF',
+    lr=0.05,
+    num_iterations=5000,
+    patience=10,
+    device='cuda',
+    show_progress: bool = False,
+    progress_desc: str = "Train NNMultitaskGP"
+):
     local_train_x = local_train_x.to(device)
     local_train_y = local_train_y.to(device)
 
     likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(num_tasks=n_tasks)
-    model = GP_models.NNMultitaskGP(local_train_x, local_train_y, likelihood, n_tasks, feature_extractor_class, covar_type)
+    model = GP_models.NNMultitaskGP(
+        local_train_x, local_train_y, likelihood,
+        n_tasks, feature_extractor_class, covar_type
+    )
 
     model = model.to(device)
     likelihood = likelihood.to(device)
@@ -635,29 +697,38 @@ def train_one_row_NNMultitaskGP(local_train_x, local_train_y, n_tasks, feature_e
     ], lr=lr)
 
     mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
-    
+
     best_loss = float('inf')
+    best_state = None
     counter = 0
 
-    # iterator = tqdm.tqdm(range(num_iterations))
-    # for i in iterator:
-    for i in range(num_iterations):
+    it = range(num_iterations)
+    it = tqdm.tqdm(it, disable=not show_progress, desc=progress_desc, leave=False)
+
+    for i in it:
         optimizer.zero_grad()
         output = model(local_train_x)
         loss = -mll(output, local_train_y)
         loss.backward()
-        # iterator.set_postfix(loss=loss.item())
         optimizer.step()
 
-        if loss <= best_loss:
-            best_loss = loss
-            best_state = model.state_dict()  
+        loss_val = loss.item()
+
+        if loss_val <= best_loss:
+            best_loss = loss_val
+            best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
             counter = 0
         else:
             counter += 1
             if counter >= patience:
-                model.load_state_dict(best_state)  
+                if best_state is not None:
+                    model.load_state_dict(best_state)
+                if show_progress:
+                    it.set_postfix(loss=f"{loss_val:.4g}", best=f"{best_loss:.4g}", early_stop=f"iter {i}")
                 break
+
+        if show_progress:
+            it.set_postfix(loss=f"{loss_val:.4g}", best=f"{best_loss:.4g}", bad=counter)
 
     return model, likelihood
 
