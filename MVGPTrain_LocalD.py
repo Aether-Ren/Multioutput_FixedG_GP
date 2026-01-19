@@ -52,13 +52,13 @@ test_y_pca = torch.tensor(Y_test_pca, dtype=torch.float32)
 
 Device = 'cuda'
 
-num_latents_candidates = [24, 32]
-num_inducing_candidates = [300, 400, 500]
-covar_type_candidates = ['RBF', 'RQ']
+# num_latents_candidates = [24, 32]
+# num_inducing_candidates = [300, 400, 500]
+# covar_type_candidates = ['RBF', 'RQ']
 
-# num_latents_candidates = [32]
-# num_inducing_candidates = [500]
-# covar_type_candidates = ['RQ']
+num_latents_candidates = [24]
+num_inducing_candidates = [500]
+covar_type_candidates = ['RQ']
 
 
 best_mse = float('inf')
