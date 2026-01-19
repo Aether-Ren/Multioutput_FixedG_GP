@@ -56,9 +56,9 @@ Device = 'cuda'
 # num_inducing_candidates = [300, 400, 500]
 # covar_type_candidates = ['RBF', 'RQ']
 
-num_latents_candidates = [24]
-num_inducing_candidates = [500]
-covar_type_candidates = ['RQ']
+num_latents_candidates = [24, 32]
+num_inducing_candidates = [500, 400]
+covar_type_candidates = ['RQ', 'RBF']
 
 
 best_mse = float('inf')
@@ -105,25 +105,25 @@ for num_latents in num_latents_candidates:
                 best_model = MVGP_models  # 保留当下最好的模型
                 best_likelihood = MVGP_likelihoods
 
-print("=====================================")
-print(f"best paramaters: {best_params}")
-print(f"best MSE: {best_mse:.4f}")
+            print("=====================================")
+            print(f"best paramaters: {best_params}")
+            print(f"best MSE: {best_mse:.4f}")
 
-# ========== 训练结束后保存最优模型 ==========
-checkpoint = {
-    'model_state_dict': best_model.state_dict(),
-    'likelihood_state_dict': best_likelihood.state_dict(),
-    'model_params': {
-        'num_latents': best_params['num_latents'],
-        'num_inducing': best_params['num_inducing'],
-        'covar_type': best_params['covar_type'],
-        'input_dim': train_x.size(1),
-        'num_tasks': train_y_pca.size(1)
-    }
-}
+            # ========== 训练结束后保存最优模型 ==========
+            checkpoint = {
+                'model_state_dict': best_model.state_dict(),
+                'likelihood_state_dict': best_likelihood.state_dict(),
+                'model_params': {
+                    'num_latents': best_params['num_latents'],
+                    'num_inducing': best_params['num_inducing'],
+                    'covar_type': best_params['covar_type'],
+                    'input_dim': train_x.size(1),
+                    'num_tasks': train_y_pca.size(1)
+                }
+            }
 
-torch.save(checkpoint, 'multitask_gp_checkpoint_LocalD.pth')
-print("save 'multitask_gp_checkpoint_LocalD.pth'")
+            torch.save(checkpoint, 'multitask_gp_checkpoint_LocalD.pth')
+            print("save 'multitask_gp_checkpoint_LocalD.pth'")
 
 
 # nohup python MVGPTrain_LocalD.py > MVGPTrain_LocalDout.log 2>&1 &
