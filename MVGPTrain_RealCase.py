@@ -48,7 +48,7 @@ train_y = torch.tensor(Y_train_std, dtype=torch.float32)
 test_y = torch.tensor(Y_test_std, dtype=torch.float32)
 
 
-Device = 'cpu'
+Device = 'cuda'
 
 num_latents_candidates = [42, 48]
 num_inducing_candidates = [400, 500]
@@ -73,7 +73,7 @@ for num_latents in num_latents_candidates:
                 lr_hyper=0.01,
                 lr_variational=0.1,
                 num_iterations=20000,
-                patience=10,
+                patience=100,
                 device=Device,
                 batch_size=512,
                 eval_every=100,
@@ -100,25 +100,25 @@ for num_latents in num_latents_candidates:
                 best_model = MVGP_models  # 
                 best_likelihood = MVGP_likelihoods
 
-print("=====================================")
-print(f"best paramaters: {best_params}")
-print(f"best MSE: {best_mse:.4f}")
+            print("=====================================")
+            print(f"best paramaters: {best_params}")
+            print(f"best MSE: {best_mse:.4f}")
 
 
-checkpoint = {
-    'model_state_dict': best_model.state_dict(),
-    'likelihood_state_dict': best_likelihood.state_dict(),
-    'model_params': {
-        'num_latents': best_params['num_latents'],
-        'num_inducing': best_params['num_inducing'],
-        'covar_type': best_params['covar_type'],
-        'input_dim': train_x.size(1),
-        'num_tasks': train_y.size(1)
-    }
-}
+            checkpoint = {
+                'model_state_dict': best_model.state_dict(),
+                'likelihood_state_dict': best_likelihood.state_dict(),
+                'model_params': {
+                    'num_latents': best_params['num_latents'],
+                    'num_inducing': best_params['num_inducing'],
+                    'covar_type': best_params['covar_type'],
+                    'input_dim': train_x.size(1),
+                    'num_tasks': train_y.size(1)
+                }
+            }
 
-torch.save(checkpoint, 'multitask_gp_checkpoint_Realcase.pth')
-print("save 'multitask_gp_checkpoint_Realcase.pth'。")
+            torch.save(checkpoint, 'multitask_gp_checkpoint_Realcase.pth')
+            print("save 'multitask_gp_checkpoint_Realcase.pth'。")
 
 
 # nohup python MVGPTrain_RealCase.py > MVGPTrain_RealCaseout.log 2>&1 &
