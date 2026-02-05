@@ -235,6 +235,28 @@ def get_outlier_indices_iqr(data, outbound = 1.5):
 ##
 ################
 
+def extract_vector_params_from_mcmc(mcmc, *, key="params", param_names=None):
+    """
+    从 Pyro MCMC 对象中提取向量参数站点 key='params'，并拆成 dict[name -> Tensor[N]]。
+    """
+    samples = mcmc.get_samples(group_by_chain=False)
+    if key not in samples:
+        raise KeyError(f"Cannot find '{key}' in mcmc.get_samples(). Available keys: {list(samples.keys())}")
+
+    theta = samples[key]  # Tensor[N, D] or Tensor[N] if D=1
+    if theta.ndim == 1:
+        theta = theta.unsqueeze(-1)
+
+    N, D = theta.shape
+    if param_names is None:
+        param_names = [f"param_{i}" for i in range(D)]
+    else:
+        if len(param_names) != D:
+            raise ValueError(f"param_names length {len(param_names)} != D {D}")
+
+    out = {name: theta[:, i].detach() for i, name in enumerate(param_names)}
+    return out
+
 
 
 def extract_exp_params_from_mcmc(mcmc, *, param_names=None, key="log_params"):
