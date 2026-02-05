@@ -488,6 +488,32 @@ def multi_start_estimation_DModel(model, row_idx, test_y, param_ranges, estimate
 ##
 #############################################
 
+def run_mcmc_Uniform_Optimized(Pre_function, Models, Likelihoods, row_idx, test_y, bounds, 
+                               num_sampling=2000, warmup_step=1000, num_chains=1, device='cpu'):
+
+    test_y = test_y.to(dtype=torch.float32, device=device)
+    
+    bounds_tensor = torch.tensor(bounds, dtype=torch.float32, device=device)
+    
+    min_vals = bounds_tensor[:, 0]
+    max_vals = bounds_tensor[:, 1]
+
+    def model():
+
+        theta = pyro.sample("params", dist.Uniform(min_vals, max_vals).to_event(1))
+        
+
+        gp_pred = Pre_function(Models, Likelihoods, theta.unsqueeze(0))
+        
+        y_obs = test_y[row_idx, :]
+        pyro.sample('obs', gp_pred, obs=y_obs)
+    
+    nuts_kernel = NUTS(model)
+    mcmc = MCMC(nuts_kernel, num_samples=num_sampling, warmup_steps=warmup_step, num_chains=num_chains)
+    
+    mcmc.run()
+    
+    return mcmc
 
 # def run_mcmc_Uniform(Pre_function, Models, Likelihoods, row_idx, test_y, bounds, num_sampling=2000, warmup_step=1000, num_chains=1):
 #     test_y = test_y.to(dtype=torch.float32)

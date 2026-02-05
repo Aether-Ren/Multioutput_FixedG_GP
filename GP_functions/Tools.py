@@ -20,6 +20,19 @@ from scipy.linalg import inv
 
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
+
+
+import numpy as np
+import torch
+import matplotlib.pyplot as plt
+from scipy.stats import gaussian_kde
+from statsmodels.graphics.tsaplots import plot_acf
+
+# Pyro diagnostics
+from pyro.ops.stats import gelman_rubin, split_gelman_rubin, effective_sample_size
+
+
+
 #############################################################################
 ## 
 #############################################################################
@@ -217,3 +230,125 @@ def get_outlier_indices_iqr(data, outbound = 1.5):
     
     outlier_indices = np.where(~mask)[0]  
     return outlier_indices
+
+#################
+##
+################
+
+
+
+def extract_exp_params_from_mcmc(mcmc, *, param_names=None, key="log_params"):
+    """
+    从 Pyro MCMC 对象中提取 samples，并对 log_params 做 exp 变成真实参数。
+    返回 dict: name -> Tensor[N]
+    """
+    samples = mcmc.get_samples(group_by_chain=False)  # dict
+    if key not in samples:
+        raise KeyError(f"Cannot find '{key}' in mcmc.get_samples(). Available keys: {list(samples.keys())}")
+
+    log_theta = samples[key]  # Tensor[N, D] or Tensor[N] if D=1
+    if log_theta.ndim == 1:
+        log_theta = log_theta.unsqueeze(-1)  # [N,1]
+
+    theta = torch.exp(log_theta)  # [N, D]
+    N, D = theta.shape
+
+    if param_names is None:
+        param_names = [f"param_{i}" for i in range(D)]
+    else:
+        if len(param_names) != D:
+            raise ValueError(f"param_names length {len(param_names)} != D {D}")
+
+    out = {name: theta[:, i].detach() for i, name in enumerate(param_names)}
+    return out
+
+
+
+def split_chain(chain_tensor: torch.Tensor):
+    """
+    将单链样本拆成两半，形成两条“伪链”
+    输入: Tensor[N]
+    输出: (Tensor[N//2], Tensor[N//2])
+    """
+    n = chain_tensor.shape[0]
+    half = n // 2
+    return chain_tensor[:half], chain_tensor[half:2*half]
+
+
+def visualize_posterior_1d_params(
+    single_chain_samples: dict,
+    *,
+    bins=15,
+    acf_lags=40,
+    clip_percentiles=(0.5, 99.5),
+    xlim=None,
+):
+    """
+    single_chain_samples: dict[name -> Tensor[N]]
+    对每个参数：split Rhat/ESS + trace + hist+KDE+quantiles + ACF
+    """
+    # 整理成 mcmc_samples：param -> Tensor[2, n_half]
+    mcmc_samples = {}
+    for param, samples in single_chain_samples.items():
+        if samples.ndim != 1:
+            raise ValueError(f"{param} should be 1D Tensor[N], got shape {tuple(samples.shape)}")
+        chain_a, chain_b = split_chain(samples)
+        mcmc_samples[param] = torch.stack([chain_a, chain_b], dim=0)  # [2, n_half]
+
+    # 诊断和可视化
+    for param, samples_chains in mcmc_samples.items():
+        rhat = gelman_rubin(samples_chains, chain_dim=0, sample_dim=1)
+        split_rhat = split_gelman_rubin(samples_chains, chain_dim=0, sample_dim=1)
+        ess = effective_sample_size(samples_chains, chain_dim=0, sample_dim=1)
+        print(f"{param}: R-hat = {rhat:.3f}, split R-hat = {split_rhat:.3f}, ESS = {ess:.1f}")
+
+        # --- Trace + Histogram/KDE ---
+        plt.figure(figsize=(12, 4))
+
+        # Trace
+        plt.subplot(1, 2, 1)
+        for i in range(2):
+            plt.plot(samples_chains[i].cpu().numpy(), marker='o', label=f"Chain {i+1}", alpha=0.7)
+        plt.title(f"Trace Plot for {param}")
+        plt.xlabel("Sample Index")
+        plt.ylabel(param)
+        plt.legend()
+
+        # Histogram + KDE + Quantiles
+        plt.subplot(1, 2, 2)
+        all_samps = samples_chains.reshape(-1).cpu().numpy()
+
+        p_lo, p_hi = clip_percentiles
+        xmin, xmax = np.percentile(all_samps, [p_lo, p_hi])
+
+        plt.hist(all_samps, bins=bins, density=True, alpha=0.7, color='gray')
+
+        # KDE（样本太少/方差太小有时会报错，所以做个保护）
+        if np.std(all_samps) > 0 and len(all_samps) > 5:
+            kde = gaussian_kde(all_samps)
+            x_grid = np.linspace(xmin, xmax, 200)
+            plt.plot(x_grid, kde(x_grid), linewidth=2)
+        else:
+            x_grid = None
+
+        qs = torch.quantile(torch.from_numpy(all_samps), torch.tensor([0.025, 0.5, 0.975]))
+        for q in qs:
+            plt.axvline(q.item(), color='red', linestyle='--', linewidth=2)
+
+        if xlim is not None:
+            plt.xlim(*xlim)
+
+        plt.title(f"Histogram + 2.5/50/97.5% Quantiles")
+        plt.xlabel("Value")
+        plt.ylabel("Density")
+        plt.tight_layout()
+        plt.show()
+
+        # --- ACF（仅第一“伪链”） ---
+        plt.figure(figsize=(6, 4))
+        plot_acf(samples_chains[0].cpu().numpy(), lags=acf_lags)
+        plt.title(f"ACF for {param} (Chain 1)")
+        plt.xlabel("Lag")
+        plt.ylabel("Autocorrelation")
+        plt.tight_layout()
+        plt.show()
