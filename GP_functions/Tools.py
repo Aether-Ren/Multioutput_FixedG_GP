@@ -235,13 +235,10 @@ def get_outlier_indices_iqr(data, outbound = 1.5):
 ##
 ################
 
-def extract_vector_params_from_mcmc(mcmc, *, key="params", param_names=None):
+def extract_vector_params_from_mcmc(samples, *, key="params", param_names=None):
     """
     从 Pyro MCMC 对象中提取向量参数站点 key='params'，并拆成 dict[name -> Tensor[N]]。
     """
-    samples = mcmc.get_samples(group_by_chain=False)
-    if key not in samples:
-        raise KeyError(f"Cannot find '{key}' in mcmc.get_samples(). Available keys: {list(samples.keys())}")
 
     theta = samples[key]  # Tensor[N, D] or Tensor[N] if D=1
     if theta.ndim == 1:
@@ -259,14 +256,11 @@ def extract_vector_params_from_mcmc(mcmc, *, key="params", param_names=None):
 
 
 
-def extract_exp_params_from_mcmc(mcmc, *, param_names=None, key="log_params"):
+def extract_exp_params_from_mcmc(samples, *, param_names=None, key="log_params"):
     """
     从 Pyro MCMC 对象中提取 samples，并对 log_params 做 exp 变成真实参数。
     返回 dict: name -> Tensor[N]
     """
-    samples = mcmc.get_samples(group_by_chain=False)  # dict
-    if key not in samples:
-        raise KeyError(f"Cannot find '{key}' in mcmc.get_samples(). Available keys: {list(samples.keys())}")
 
     log_theta = samples[key]  # Tensor[N, D] or Tensor[N] if D=1
     if log_theta.ndim == 1:
