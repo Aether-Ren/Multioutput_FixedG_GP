@@ -22,8 +22,6 @@ from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 
 
-import numpy as np
-import torch
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
 from statsmodels.graphics.tsaplots import plot_acf
