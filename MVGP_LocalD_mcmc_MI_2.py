@@ -18,10 +18,10 @@ import GP_functions.Tools as Tools
 import GP_functions.FeatureE as FeatureE
 
 X_train = pd.read_csv('Data/Data20260110/X_train_Final_10.csv', header=None, delimiter=',').values
-X_test = pd.read_csv('LocalDisease/X_MI_1_5.csv', header=None, delimiter=',').values
+X_test = pd.read_csv('LocalDisease/X_MI_2.csv', header=None, delimiter=',').values
 
 Y_train_pca = pd.read_csv('Data/Data20260110/Y_data_train_pca.csv', header=None, delimiter=',').values
-Y_test_21 = pd.read_csv('LocalDisease/Y_data_MI_1_pca.csv', header=None, delimiter=',').values
+Y_test_21 = pd.read_csv('LocalDisease/Y_data_MI_2_pca.csv', header=None, delimiter=',').values
 
 
 
@@ -41,7 +41,7 @@ torch.set_default_dtype(torch.float32)
 Device = 'cuda'
 
 
-mcmc_dir = 'LocalDisease/Result/MVGP_MI_1_mcmc_result'
+mcmc_dir = 'LocalDisease/Result/MVGP_MI_2_mcmc_result'
 if not os.path.exists(mcmc_dir):
     os.makedirs(mcmc_dir)
 
@@ -91,4 +91,4 @@ for row_idx in range(test_y_21.shape[0]):
 
 
 
-# nohup python MVGP_LocalD_mcmc_MI_1.py > MVGP_LocalD_mcmc_MI_1out.log 2>&1 &
+# nohup python MVGP_LocalD_mcmc_MI_2.py > MVGP_LocalD_mcmc_MI_2out.log 2>&1 &
