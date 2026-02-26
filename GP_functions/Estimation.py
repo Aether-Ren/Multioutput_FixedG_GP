@@ -497,6 +497,7 @@ def run_mcmc_Uniform_Optimized(Pre_function, Models, Likelihoods, row_idx, test_
     
     min_vals = bounds_tensor[:, 0]
     max_vals = bounds_tensor[:, 1]
+    y_obs = test_y[row_idx, :]
 
     def model():
 
@@ -505,7 +506,7 @@ def run_mcmc_Uniform_Optimized(Pre_function, Models, Likelihoods, row_idx, test_
 
         gp_pred = Pre_function(Models, Likelihoods, theta.unsqueeze(0))
         
-        y_obs = test_y[row_idx, :]
+        
         pyro.sample('obs', gp_pred, obs=y_obs)
     
     nuts_kernel = NUTS(model)
@@ -563,6 +564,7 @@ def run_mcmc_Uniform(Pre_function, Models, Likelihoods, row_idx, test_y, bounds,
             torch.tensor(b[1], dtype=torch.float32, device=device)
         ) for b in bounds
     ]
+    y_obs = test_y[row_idx, :]
     
     def model():
         params = []
@@ -574,7 +576,7 @@ def run_mcmc_Uniform(Pre_function, Models, Likelihoods, row_idx, test_y, bounds,
         
         gp_pred = Pre_function(Models, Likelihoods, theta.unsqueeze(0))
         
-        y_obs = test_y[row_idx, :]
+        
         pyro.sample('obs', gp_pred, obs=y_obs)
     
     nuts_kernel = NUTS(model)

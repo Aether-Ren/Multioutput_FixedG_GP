@@ -292,6 +292,7 @@ def split_chain(chain_tensor: torch.Tensor):
 def visualize_posterior_1d_params(
     single_chain_samples: dict,
     *,
+    true_params_tensor=None,        # <- 新增：torch Tensor[D]，比如 test_x[0]
     bins=15,
     acf_lags=40,
     clip_percentiles=(0.5, 99.5),
@@ -299,8 +300,35 @@ def visualize_posterior_1d_params(
 ):
     """
     single_chain_samples: dict[name -> Tensor[N]]
+    true_params_tensor: Tensor[D]，若提供，会在 trace/hist 上标出真实值
     对每个参数：split Rhat/ESS + trace + hist+KDE+quantiles + ACF
     """
+
+    # --- display name mapping (theta_0..theta_9 -> Ca_1..Cb_5) ---
+    param_labels = ["Ca_1","Cb_1","Ca_2","Cb_2","Ca_3","Cb_3","Ca_4","Cb_4","Ca_5","Cb_5"]
+    name_map = {f"theta_{i}": param_labels[i] for i in range(len(param_labels))}
+    name_map.update({f"param_{i}": param_labels[i] for i in range(len(param_labels))})
+
+    def display_name(p: str) -> str:
+        return name_map.get(p, p)
+
+    def parse_index(p: str):
+        # 只对 theta_7 / param_7 这种形式返回 index
+        try:
+            head, tail = p.split("_", 1)
+            if head in ("theta", "param"):
+                return int(tail)
+        except Exception:
+            return None
+        return None
+
+    # 真实参数向量准备
+    if true_params_tensor is not None:
+        if not torch.is_tensor(true_params_tensor):
+            true_vec = torch.tensor(true_params_tensor, dtype=torch.float32).detach().flatten().cpu()
+    else:
+        true_vec = None
+
     # 整理成 mcmc_samples：param -> Tensor[2, n_half]
     mcmc_samples = {}
     for param, samples in single_chain_samples.items():
@@ -311,10 +339,21 @@ def visualize_posterior_1d_params(
 
     # 诊断和可视化
     for param, samples_chains in mcmc_samples.items():
+        disp = display_name(param)
+
+        idx = parse_index(param)
+        true_val = None
+        if (true_vec is not None) and (idx is not None) and (0 <= idx < true_vec.numel()):
+            true_val = float(true_vec[idx].item())
+
         rhat = gelman_rubin(samples_chains, chain_dim=0, sample_dim=1)
         split_rhat = split_gelman_rubin(samples_chains, chain_dim=0, sample_dim=1)
         ess = effective_sample_size(samples_chains, chain_dim=0, sample_dim=1)
-        print(f"{param}: R-hat = {rhat:.3f}, split R-hat = {split_rhat:.3f}, ESS = {ess:.1f}")
+
+        if true_val is None:
+            print(f"{disp}: R-hat = {rhat:.3f}, split R-hat = {split_rhat:.3f}, ESS = {ess:.1f}")
+        else:
+            print(f"{disp}: R-hat = {rhat:.3f}, split R-hat = {split_rhat:.3f}, ESS = {ess:.1f}, true = {true_val:.6g}")
 
         # --- Trace + Histogram/KDE ---
         plt.figure(figsize=(12, 4))
@@ -323,9 +362,13 @@ def visualize_posterior_1d_params(
         plt.subplot(1, 2, 1)
         for i in range(2):
             plt.plot(samples_chains[i].cpu().numpy(), marker='o', label=f"Chain {i+1}", alpha=0.7)
-        plt.title(f"Trace Plot for {param}")
+
+        if true_val is not None:
+            plt.axhline(true_val, linestyle="--", linewidth=2, label="True value", color="green")  # 真实值水平线
+
+        plt.title(f"Trace Plot for {disp}")
         plt.xlabel("Sample Index")
-        plt.ylabel(param)
+        plt.ylabel(disp)
         plt.legend()
 
         # Histogram + KDE + Quantiles
@@ -335,6 +378,14 @@ def visualize_posterior_1d_params(
         p_lo, p_hi = clip_percentiles
         xmin, xmax = np.percentile(all_samps, [p_lo, p_hi])
 
+        # 确保真实值在线性范围内（避免被裁掉看不到）
+        if true_val is not None:
+            xmin = min(xmin, true_val)
+            xmax = max(xmax, true_val)
+            # 给一点边距
+            pad = 0.02 * (xmax - xmin + 1e-12)
+            xmin, xmax = xmin - pad, xmax + pad
+
         plt.hist(all_samps, bins=bins, density=True, alpha=0.7, color='gray')
 
         # KDE（样本太少/方差太小有时会报错，所以做个保护）
@@ -342,26 +393,30 @@ def visualize_posterior_1d_params(
             kde = gaussian_kde(all_samps)
             x_grid = np.linspace(xmin, xmax, 200)
             plt.plot(x_grid, kde(x_grid), linewidth=2)
-        else:
-            x_grid = None
 
         qs = torch.quantile(torch.from_numpy(all_samps), torch.tensor([0.025, 0.5, 0.975]))
         for q in qs:
             plt.axvline(q.item(), color='red', linestyle='--', linewidth=2)
 
+        if true_val is not None:
+            plt.axvline(true_val, linewidth=2, label="True value", color="green")  # 真实值竖线
+
         if xlim is not None:
             plt.xlim(*xlim)
+        else:
+            plt.xlim(xmin, xmax)
 
-        plt.title(f"Histogram + 2.5/50/97.5% Quantiles")
+        plt.title(f"Histogram + 2.5/50/97.5% Quantiles ({disp})")
         plt.xlabel("Value")
         plt.ylabel("Density")
+        plt.legend()
         plt.tight_layout()
         plt.show()
 
         # --- ACF（仅第一“伪链”） ---
         plt.figure(figsize=(6, 4))
         plot_acf(samples_chains[0].cpu().numpy(), lags=acf_lags)
-        plt.title(f"ACF for {param} (Chain 1)")
+        plt.title(f"ACF for {disp} (Chain 1)")
         plt.xlabel("Lag")
         plt.ylabel("Autocorrelation")
         plt.tight_layout()
