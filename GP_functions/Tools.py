@@ -413,7 +413,7 @@ def visualize_posterior_1d_params(
         plt.tight_layout()
         plt.show()
 
-        # --- ACF（仅第一“伪链”） ---
+        # --- ACF ---
         plt.figure(figsize=(6, 4))
         plot_acf(samples_chains[0].cpu().numpy(), lags=acf_lags)
         plt.title(f"ACF for {disp} (Chain 1)")
